@@ -108,6 +108,26 @@ function buildFromCSV(file, defaultTag) {
   return out;
 }
 
+/* Parse the ladrift/toefl plain-text format: `word#pos. 中文释义, [同]synonyms;`
+   MIT-licensed, TOEFL-specific, with Chinese meanings. */
+function buildFromLadriftTxt(file) {
+  const text = fs.readFileSync(file, 'utf-8');
+  const out = [];
+  text.split(/\r?\n/).forEach(line => {
+    line = line.trim();
+    if (!line || !line.includes('#')) return;
+    const hash = line.indexOf('#');
+    const word = line.slice(0, hash).trim();
+    if (!word || !/^[a-zA-Z][a-zA-Z'\-]*$/.test(word)) return; // single words only (no phrases)
+    let rest = line.slice(hash + 1).trim();
+    // strip the " [同]synonyms" segments — keep Chinese meaning only
+    rest = rest.replace(/\s*\[同\][^;]*/g, '').replace(/;\s*$/,'').trim();
+    const cn = cleanCn(rest);
+    out.push({ en: word, phon: '', cn, def: '', pos: '', tags: 'toefl', examples: [] });
+  });
+  return out;
+}
+
 /* ---- merge multiple sources, dedupe by lowercased word, keep richest ---- */
 function mergeBank(lists) {
   const map = new Map();
@@ -132,17 +152,28 @@ function mergeBank(lists) {
 }
 
 /* ---- run ---- */
-const sources = [
+// CSV sources (AlphaYuU, Apache-2.0): columns include word/translation/tag/examples
+const csvSources = [
   ['ielts.csv', 'ielts'],
-  ['toefl.csv', 'toefl'],
   ['cet6.csv', 'cet6']
 ];
+// Plain-text TOEFL source (ladrift/toefl, MIT): `word#中文释义` lines
+const txtSources = [
+  ['toefl_ladrift.txt']
+];
 const lists = [];
-for (const [file, tag] of sources) {
+for (const [file, tag] of csvSources) {
   const p = path.join(RAW, file);
   if (!fs.existsSync(p)) { console.log(`(skip missing ${file})`); continue; }
   const list = buildFromCSV(p, tag);
   console.log(`${file}: parsed ${list.length} words`);
+  lists.push(list);
+}
+for (const [file] of txtSources) {
+  const p = path.join(RAW, file);
+  if (!fs.existsSync(p)) { console.log(`(skip missing ${file})`); continue; }
+  const list = buildFromLadriftTxt(p);
+  console.log(`${file}: parsed ${list.length} TOEFL words`);
   lists.push(list);
 }
 const bank = mergeBank(lists);
@@ -151,7 +182,7 @@ bank.sort((a, b) => a.en.localeCompare(b.en));
 
 const payload = {
   generatedAt: new Date().toISOString(),
-  source: 'AlphaYuU/Ewords-English-Dictation (Apache-2.0)',
+  source: 'AlphaYuU/Ewords-English-Dictation (Apache-2.0) + ladrift/toefl (MIT)',
   count: bank.length,
   words: bank
 };
