@@ -523,12 +523,52 @@
   /* ============================================================
      ENCYCLOPEDIA (word flip cards + online fill + self-edit)
      ============================================================ */
+
+  /* Fuzzy autocomplete: prefix matches first, then Levenshtein matches.
+     Returns up to `limit` candidates ranked by relevance. */
+  function suggestWords(query, limit = 10) {
+    const q = (query || '').toLowerCase().trim();
+    if (!q) return [];
+    const bank = window.IELTS.BANK;
+    const starts = [];   // prefix matches (highest priority)
+    const contains = []; // substring matches
+    const close = [];    // fuzzy (edit-distance) matches
+    for (const w of bank) {
+      const en = w.en.toLowerCase();
+      if (en.startsWith(q)) starts.push(w);
+      else if (en.includes(q)) contains.push(w);
+    }
+    // only compute fuzzy if prefix/substring results are thin
+    if (starts.length + contains.length < limit) {
+      for (const w of bank) {
+        const en = w.en.toLowerCase();
+        if (en.startsWith(q) || en.includes(q)) continue;
+        const dist = window.Fuzzy.levenshtein(q, en);
+        const maxD = q.length <= 3 ? 1 : q.length <= 6 ? 2 : 3;
+        if (dist <= maxD) close.push({ w, dist });
+      }
+      close.sort((a, b) => a.dist - b.dist);
+    }
+    return [...starts, ...contains, ...close.map(c => c.w)].slice(0, limit);
+  }
+
+  /* Highlight the matched portion of a word for display. */
+  function highlightMatch(word, query) {
+    const q = (query || '').toLowerCase().trim();
+    const i = word.toLowerCase().indexOf(q);
+    if (i < 0) return esc(word);
+    return esc(word.slice(0, i)) + '<mark>' + esc(word.slice(i, i + q.length)) + '</mark>' + esc(word.slice(i + q.length));
+  }
+
   function renderEncyclopedia() {
     view.innerHTML = `
       <h1 class="page-title">Word Encyclopedia</h1>
       <p class="page-sub">Flip a card for phonetics, definitions, examples, synonyms & etymology. Add your own examples.</p>
       <div class="row section">
-        <input id="encSearch" class="input" placeholder="Search a word (e.g. poisonous)..." style="flex:1;" autocomplete="off" spellcheck="false" />
+        <div class="autocomplete-wrap">
+          <input id="encSearch" class="input" placeholder="Search a word (e.g. poisonous)..." autocomplete="off" spellcheck="false" />
+          <div class="autocomplete" id="encAuto"></div>
+        </div>
         <button class="btn" id="encGo">Look Up</button>
         <button class="btn secondary" id="encRandom">🎲 Random</button>
       </div>
@@ -601,13 +641,86 @@
       });
       $('#exInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#exAdd').click(); });
     };
-    $('#encGo').addEventListener('click', () => show($('#encSearch').value));
+    $('#encGo').addEventListener('click', () => { closeAuto(); show($('#encSearch').value); });
     $('#encRandom').addEventListener('click', () => {
       const w = pick(window.IELTS.BANK);
       $('#encSearch').value = w.en;
       show(w.en);
     });
-    $('#encSearch').addEventListener('keydown', e => { if (e.key === 'Enter') show($('#encSearch').value); });
+
+    /* ---- autocomplete wiring ---- */
+    const autoBox = $('#encAuto');
+    let acList = [];     // current candidate words
+    let acActive = -1;   // highlighted index
+
+    const closeAuto = () => { autoBox.classList.remove('open'); autoBox.innerHTML = ''; acActive = -1; };
+    const markActive = () => {
+      autoBox.querySelectorAll('.ac-item').forEach((it, i) =>
+        it.classList.toggle('active', i === acActive));
+      // scroll active item into view
+      const el = autoBox.querySelector('.ac-item.active');
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    };
+    const choose = (w) => {
+      $('#encSearch').value = w.en;
+      closeAuto();
+      show(w.en);
+    };
+
+    const refreshAuto = () => {
+      const q = $('#encSearch').value;
+      acList = suggestWords(q, 10);
+      if (!q.trim() || !acList.length) {
+        autoBox.innerHTML = q.trim() ? `<div class="ac-empty">No matches for “${esc(q)}”.</div>` : '';
+        autoBox.classList.toggle('open', !!q.trim());
+        acActive = -1;
+        return;
+      }
+      autoBox.innerHTML = acList.map((w, i) =>
+        `<div class="ac-item" data-i="${i}">
+           <span class="ac-word">${highlightMatch(w.en, q)}</span>
+           <span class="ac-cn">${esc((w.cn || '').split(/[；;,]/)[0])}</span>
+           <span class="ac-tag">${(w.tags || 'word').split(/\s+/)[0]}</span>
+         </div>`).join('');
+      acActive = -1;
+      autoBox.classList.add('open');
+    };
+
+    // typing → refresh suggestions (debounced)
+    let acTimer = null;
+    $('#encSearch').addEventListener('input', () => {
+      clearTimeout(acTimer);
+      acTimer = setTimeout(refreshAuto, 120);
+    });
+    // keyboard navigation
+    $('#encSearch').addEventListener('keydown', e => {
+      const open = autoBox.classList.contains('open');
+      if (e.key === 'ArrowDown' && open) {
+        e.preventDefault();
+        acActive = Math.min(acActive + 1, acList.length - 1); markActive();
+      } else if (e.key === 'ArrowUp' && open) {
+        e.preventDefault();
+        acActive = Math.max(acActive - 1, 0); markActive();
+      } else if (e.key === 'Enter') {
+        if (open && acActive >= 0 && acList[acActive]) { e.preventDefault(); choose(acList[acActive]); }
+        else if (open && acList.length) { e.preventDefault(); choose(acList[0]); }
+        else { closeAuto(); show($('#encSearch').value); }
+      } else if (e.key === 'Escape') {
+        closeAuto();
+      }
+    });
+    // click a suggestion
+    autoBox.addEventListener('click', e => {
+      const item = e.target.closest('.ac-item');
+      if (item && acList[+item.dataset.i]) choose(acList[+item.dataset.i]);
+    });
+    // close when clicking outside the search area
+    if (window._encDocClick) document.removeEventListener('click', window._encDocClick);
+    window._encDocClick = (e) => {
+      if (!e.target.closest('.autocomplete-wrap')) closeAuto();
+    };
+    document.addEventListener('click', window._encDocClick);
+
     // auto-show a random one
     const w = pick(window.IELTS.BANK);
     $('#encSearch').value = w.en;
