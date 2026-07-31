@@ -692,7 +692,7 @@
       $('#encSay').addEventListener('click', () => window.Audio2.speakWord(word));
       // read-aloud buttons for each example sentence
       view.querySelectorAll('[data-say]').forEach(b =>
-        b.addEventListener('click', () => window.Audio2.speak(b.dataset.say)));
+        b.addEventListener('click', () => { window.Audio2.speak(b.dataset.say); }));
       $('#exAdd').addEventListener('click', () => {
         const v = $('#exInput').value.trim();
         if (!v) return;
