@@ -285,6 +285,26 @@ html, body {
 /* ============ CHART ============ */
 canvas { width: 100%; height: auto; display: block; }
 
+/* ============ INLINE READ-ALOUD BUTTON (for example sentences) ============ */
+.say-inline {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; margin-right: 6px;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: var(--grad-soft); color: var(--c2);
+  font-size: .8rem; line-height: 1;
+  vertical-align: middle; flex-shrink: 0;
+  transition: transform .12s, background .15s;
+}
+.say-inline:hover { transform: scale(1.15); background: rgba(14,165,233,.25); }
+.say-inline:active { transform: scale(.95); }
+/* make example list items lay out the button + text nicely */
+#exList li { display: flex; align-items: flex-start; gap: 2px; margin-bottom: 6px; }
+#exList li .say-inline { margin-top: 2px; }
+#exList li .ex-text { flex: 1; }
+.flip-back .ex { display: flex; align-items: flex-start; gap: 4px; }
+.flip-back .ex .say-inline { background: rgba(255,255,255,.2); color: #fff; margin-top: 1px; }
+.flip-back .ex .say-inline:hover { background: rgba(255,255,255,.35); }
+
 /* ============ TOAST ============ */
 .toast {
   position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(40px);

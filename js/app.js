@@ -215,7 +215,9 @@
           dots[idx] = 'ok';
         } else {
           fb.className = 'feedback bad';
-          fb.innerHTML = `✗ Correct answer: <b>${esc(w.en)}</b> (you wrote "${esc(ans)}")`;
+          fb.innerHTML = `✗ Correct answer: <button class="say-inline" data-say="${esc(w.en)}" title="Read aloud">🔊</button><b>${esc(w.en)}</b> (you wrote "${esc(ans)}")`;
+          const sb = fb.querySelector('[data-say]');
+          if (sb) sb.addEventListener('click', () => window.Audio2.speakWord(w.en));
           window.Store.setErrorField(w.en, { wrongCount: (w.wrongCount || 0) + 1 });
           dots[idx] = 'bad';
           $('#dInput').classList.add('shake');
@@ -471,7 +473,9 @@
         window.Store.bump('cnEnDone');
       } else {
         fb.className = 'feedback bad';
-        fb.innerHTML = `✗ 正确答案：<b>${esc(p.en)}</b>`;
+        fb.innerHTML = `✗ 正确答案：<button class="say-inline" data-say="${esc(p.en)}" title="Read aloud">🔊</button><b>${esc(p.en)}</b>`;
+        const sb = fb.querySelector('[data-say]');
+        if (sb) sb.addEventListener('click', () => window.Audio2.speakWord(p.en));
         $('#phInput').classList.add('shake');
       }
       $('#phInput').disabled = true;
@@ -548,7 +552,9 @@
 
           <h4 style="margin-top:10px;">Example Sentences <span class="muted" style="font-weight:400;font-size:.8rem;">(${examples.filter(e=>e&&e!=='—').length})</span></h4>
           <ul id="exList" style="margin:6px 0 6px 18px;line-height:1.7;">${examples.map(e =>
-            `<li>${e === '—' ? '<span class="muted">No example yet — add your own below.</span>' : esc(e)}</li>`).join('')}</ul>
+            e === '—'
+              ? `<li><span class="ex-text muted">No example yet — add your own below.</span></li>`
+              : `<li><button class="say-inline" data-say="${esc(e)}" title="Read aloud">🔊</button><span class="ex-text">${esc(e)}</span></li>`).join('')}</ul>
           <div class="row" style="margin-top:6px;">
             <input id="exInput" class="input" placeholder="Add your own example sentence..." style="flex:1;" />
             <button class="btn small" id="exAdd">Add</button>
@@ -560,6 +566,9 @@
           ${(!online) ? `<div class="muted" style="margin-top:10px;font-size:.8rem;">Offline or word not found — showing built-in data only.</div>` : ''}
         </div>`;
       $('#encSay').addEventListener('click', () => window.Audio2.speakWord(word));
+      // read-aloud buttons for each example sentence
+      view.querySelectorAll('[data-say]').forEach(b =>
+        b.addEventListener('click', () => window.Audio2.speak(b.dataset.say)));
       $('#exAdd').addEventListener('click', () => {
         const v = $('#exInput').value.trim();
         if (!v) return;
@@ -730,7 +739,7 @@
           </div>
           <div class="flip-face flip-back">
             <h4>${esc(w.en)} <span class="phon">${esc(w.phon || '')}</span></h4>
-            ${examples.length ? examples.map(e => `<div class="ex">• ${esc(e)}</div>`).join('') : '<div class="ex">No example.</div>'}
+            ${examples.length ? examples.map(e => `<div class="ex"><button class="say-inline" data-say="${esc(e)}" title="Read aloud">🔊</button><span>${esc(e)}</span></div>`).join('') : '<div class="ex">No example.</div>'}
             ${w.etymology ? `<div class="etym"><b>Origin:</b> ${esc(w.etymology)}</div>` : ''}
           </div>
         </div>
@@ -741,13 +750,17 @@
   function bindFlip(wrap, word) {
     const card = wrap.querySelector('.flip-card');
     card.addEventListener('click', e => {
+      // clicking an inline read-aloud button should NOT flip the card
+      if (e.target.closest('.say-inline')) return;
       card.classList.toggle('flipped');
-      // tap-to-speak when on the front face (clicking the big word)
-      if (!card.classList.contains('flipped') || e.target.classList.contains('big')) {
-        // speak on flip
-      }
       window.Audio2.speakWord(word);
     });
+    // wire up per-example read-aloud buttons (on the back face)
+    wrap.querySelectorAll('[data-say]').forEach(b =>
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        window.Audio2.speak(b.dataset.say);
+      }));
   }
 
   /* ============================================================
