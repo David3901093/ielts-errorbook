@@ -179,12 +179,12 @@
       view.innerHTML = `
         <h1 class="page-title">Dictation</h1>
         <p class="page-sub">Type the English word for the meaning shown. <b>+1</b> correct, <b>−3</b> wrong.</p>
-        <div class="card dictate-box" style="max-width:560px;margin:0 auto;">
-          <div class="row" style="justify-content:space-between;">
+        <div class="card dictate-box dictate-card" style="max-width:560px;margin-left:auto;margin-right:auto;">
+          <div class="row card-top" style="justify-content:space-between;">
             <span class="badge">Word ${idx + 1} / ${queue.length}</span>
             <button class="icon-btn" id="sayBtn" title="Hear pronunciation">🔊</button>
           </div>
-          <h2 class="word-cn" style="margin-top:14px;">${esc(w.cn)}</h2>
+          <h2 class="word-cn">${esc(w.cn)}</h2>
           <div class="word-hint">${'• '.repeat((w.en || '').length)} ${w.en.length} letters</div>
           <input id="dInput" class="input dictate-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="type the word..." />
           <div class="feedback" id="fb"></div>
@@ -395,12 +395,12 @@
         </div>
       </div>
 
-      <div class="card section" style="max-width:620px;margin:0 auto;">
-        <div class="row" style="justify-content:space-between;">
+      <div class="card section dictate-card" style="max-width:620px;margin-left:auto;margin-right:auto;">
+        <div class="row card-top" style="justify-content:space-between;">
           <span class="badge" id="phProg">Ready</span>
           <button class="icon-btn" id="phSay">🔊</button>
         </div>
-        <h2 class="word-cn" id="phQ" style="margin-top:14px;">点击下方按钮开始默写</h2>
+        <h2 class="word-cn" id="phQ">点击下方按钮开始默写</h2>
         <input id="phInput" class="input dictate-input" placeholder="输入英文词组..." disabled autocomplete="off" spellcheck="false" />
         <div class="feedback" id="phFb"></div>
         <div class="row" style="justify-content:center;margin-top:18px;">

@@ -195,6 +195,11 @@ html, body {
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
 /* ============ DICTATION ============ */
+/* Roomier card for dictation/CN-EN so the prompt isn't cramped against the edges */
+.dictate-card { padding: 30px 32px; margin-top: 10px; margin-bottom: 10px; }
+.dictate-card .card-top { margin-bottom: 18px; }
+.dictate-card .word-cn { margin-top: 6px; margin-bottom: 18px; }
+.dictate-card .dictate-input { margin-bottom: 6px; }
 .dictate-box { text-align: center; }
 .dictate-box .word-cn { font-size: 1.7rem; font-weight: 600; margin-bottom: 4px; }
 .dictate-box .word-hint { color: var(--text-mute); font-size: .85rem; margin-bottom: 18px; }
