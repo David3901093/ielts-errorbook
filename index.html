@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IELTS Error Book · Vocabulary Trainer</title>
+  <meta name="description" content="An offline-friendly IELTS vocabulary trainer with error bank, dictation, daily review and flip cards." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Ambient glow background -->
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <!-- ============ HEADER / TAB BAR ============ -->
+  <header class="topbar">
+    <div class="brand" data-route="dashboard">
+      <span class="brand-logo">📘</span>
+      <span class="brand-name">IELTS<span class="brand-accent"> Error Book</span></span>
+    </div>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-route="dashboard">Dashboard</button>
+      <button class="tab" data-route="dictation">Dictation</button>
+      <button class="tab" data-route="bank">Error Bank</button>
+      <button class="tab" data-route="cnen">CN → EN</button>
+      <button class="tab" data-route="encyclopedia">Encyclopedia</button>
+      <button class="tab" data-route="cards">Cards</button>
+      <button class="tab tab-more" data-route="stats">Stats</button>
+      <button class="tab tab-more" data-route="vocab">Vocabulary</button>
+      <button class="tab tab-more" data-route="calendar">Calendar</button>
+      <button class="tab tab-more-toggle" id="moreToggle">More ▾</button>
+    </nav>
+
+    <div class="header-right">
+      <div class="score-pill" id="scorePill" title="Total score">
+        <span class="score-label">SCORE</span>
+        <span class="score-value" id="totalScore">0</span>
+      </div>
+      <button class="icon-btn" id="soundToggle" title="Toggle pronunciation" aria-label="Toggle sound">🔊</button>
+    </div>
+  </header>
+
+  <!-- ============ MAIN VIEW ============ -->
+  <main id="view" class="view"></main>
+
+  <!-- ============ FLOATING NOTIFICATION ============ -->
+  <div id="toast" class="toast"></div>
+
+  <!-- ============ SCRIPTS ============ -->
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/fuzzy.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

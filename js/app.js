@@ -1,0 +1,859 @@
+/* ============================================================
+   app.js — SPA router + page renderers + interactions
+   ============================================================ */
+(function () {
+  'use strict';
+
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const view = $('#view');
+  let currentRoute = 'dashboard';
+
+  /* ----------------------------- utils ----------------------------- */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function el(html) {
+    const t = document.createElement('template');
+    t.innerHTML = html.trim();
+    return t.content.firstElementChild;
+  }
+  function toast(msg, type = '') {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => (t.className = 'toast'), 1800);
+  }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function getWordFromBank(en) {
+    return window.IELTS.BANK.find(w => w.en.toLowerCase() === (en || '').toLowerCase());
+  }
+
+  /* ----------------------------- score header ----------------------------- */
+  function refreshScore() {
+    const p = window.Store.getProgress();
+    const pill = $('#scorePill');
+    $('#totalScore').textContent = p.totalScore;
+    pill.classList.toggle('bad', p.totalScore < 0);
+  }
+  function animateScore(delta) {
+    const pill = $('#scorePill');
+    pill.classList.remove('pop');
+    void pill.offsetWidth;
+    pill.classList.add('pop');
+    toast((delta > 0 ? '+' : '') + delta + (delta > 0 ? ' ✓' : ' ✗'), delta > 0 ? 'ok' : 'bad');
+  }
+
+  /* ============================================================
+     ROUTER
+     ============================================================ */
+  const ROUTES = {
+    dashboard: renderDashboard,
+    dictation: renderDictation,
+    bank: renderBank,
+    cnen: renderCnEn,
+    encyclopedia: renderEncyclopedia,
+    cards: renderCards,
+    stats: renderStats,
+    vocab: renderVocab,
+    calendar: renderCalendar
+  };
+
+  function go(route) {
+    if (!ROUTES[route]) route = 'dashboard';
+    currentRoute = route;
+    document.querySelectorAll('.tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.route === route));
+    // collapse mobile "more" menu
+    $('#tabs').classList.remove('open');
+    view.scrollTop = 0;
+    ROUTES[route]();
+    refreshScore();
+    // hash for shareable state
+    history.replaceState(null, '', '#' + route);
+  }
+
+  /* ============================================================
+     DASHBOARD (home)
+     ============================================================ */
+  function renderDashboard() {
+    const p = window.Store.touchVisit();
+    const today = window.todayKey();
+    const yKey = window.todayKey(new Date(Date.now() - 86400000));
+    const y = p.days[yKey];
+    const todayDay = p.days[today] || {};
+    const errors = window.Store.getErrors();
+    const reviewable = errors.filter(e => !e.mastered);
+
+    let banner = '';
+    if (todayDay.failed) {
+      banner = `<div class="banner fail">⚠️ Today's score is below 0 — today is marked <b>Unqualified</b>. Keep practising to rebuild your score!</div>`;
+    } else if (reviewable.length && !todayDay.reviewDone) {
+      banner = `<div class="banner review">📌 You have <b>${reviewable.length}</b> error-word${reviewable.length > 1 ? 's' : ''} to review today. <button class="btn small" id="goReview">Start Review</button></div>`;
+    } else if (todayDay.reviewDone) {
+      banner = `<div class="banner ok">✅ Daily review complete! Great work. Come back tomorrow.</div>`;
+    }
+
+    // yesterday stats
+    const yAdded = y ? y.wordsAdded : 0;
+    const yAcc = y && (y.correct + y.wrong) > 0 ? Math.round((y.correct / (y.correct + y.wrong)) * 100) : '—';
+
+    view.innerHTML = `
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-sub">Your daily IELTS training hub · ${today}</p>
+      ${banner}
+
+      <div class="grid grid-4 section">
+        <div class="card stat"><div class="num">${p.totalScore}</div><div class="lbl">TOTAL SCORE</div></div>
+        <div class="card stat"><div class="num">${todayDay.score ?? 0}</div><div class="lbl">TODAY'S SCORE</div></div>
+        <div class="card stat"><div class="num">${p.streak || 0} 🔥</div><div class="lbl">DAY STREAK</div></div>
+        <div class="card stat"><div class="num">${errors.length}</div><div class="lbl">ERROR WORDS</div></div>
+      </div>
+
+      <div class="grid grid-2 section">
+        <div class="card">
+          <h3>📊 Yesterday Recap</h3>
+          <div class="muted">${yKey}</div>
+          <ul style="list-style:none;line-height:2;margin-top:8px;">
+            <li>Words added: <b>${yAdded}</b></li>
+            <li>Accuracy: <b>${yAcc}${yAcc !== '—' ? '%' : ''}</b></li>
+            <li>Yesterday score: <b>${y ? y.score : 0}</b></li>
+            <li>Review status: <b>${y ? (y.reviewDone ? '✓ Done' : 'Incomplete') : '—'}</b></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🚀 Quick Actions</h3>
+          <div class="row" style="margin-top:6px;">
+            <button class="btn" data-go="dictation">Start Dictation</button>
+            <button class="btn secondary" data-go="cnen">CN → EN</button>
+            <button class="btn secondary" data-go="cards">Flip Cards</button>
+          </div>
+          <div class="muted" style="margin-top:14px;">Daily review re-tests your error words so they stick in long-term memory.</div>
+        </div>
+      </div>
+
+      <div class="card section">
+        <h3>🎴 Today's Recommended Cards</h3>
+        <div class="muted" style="margin-bottom:12px;">Tap a card to flip and reveal its meaning.</div>
+        <div class="card-grid" id="homeCards"></div>
+      </div>
+    `;
+
+    // quick action nav
+    view.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+    const gr = $('#goReview'); if (gr) gr.addEventListener('click', () => go('dictation'));
+
+    // mini recommended cards (3 flip cards from bank)
+    const pool = window.IELTS.BANK.filter(w => w.examples && w.examples.length);
+    const picks = shuffle(pool).slice(0, 3);
+    const wrap = $('#homeCards');
+    picks.forEach(w => wrap.appendChild(buildFlipCard(w)));
+  }
+
+  /* ============================================================
+     DICTATION (random error words) + daily review mode
+     ============================================================ */
+  function renderDictation() {
+    const errors = window.Store.getErrors().filter(e => !e.mastered);
+    if (!errors.length) {
+      view.innerHTML = emptyState('No error words yet',
+        'Add words you keep misspelling to the Error Bank, or they will appear here after you add them.',
+        'Go to Error Bank', 'bank');
+      return;
+    }
+    const queue = shuffle(errors).slice(0, Math.min(10, errors.length));
+    let idx = 0;
+    let dots = queue.map(() => '');
+
+    const draw = () => {
+      const w = queue[idx];
+      view.innerHTML = `
+        <h1 class="page-title">Dictation</h1>
+        <p class="page-sub">Type the English word for the meaning shown. <b>+1</b> correct, <b>−3</b> wrong.</p>
+        <div class="card dictate-box" style="max-width:560px;margin:0 auto;">
+          <div class="row" style="justify-content:space-between;">
+            <span class="badge">Word ${idx + 1} / ${queue.length}</span>
+            <button class="icon-btn" id="sayBtn" title="Hear pronunciation">🔊</button>
+          </div>
+          <h2 class="word-cn" style="margin-top:14px;">${esc(w.cn)}</h2>
+          <div class="word-hint">${'• '.repeat((w.en || '').length)} ${w.en.length} letters</div>
+          <input id="dInput" class="input dictate-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="type the word..." />
+          <div class="feedback" id="fb"></div>
+          <div class="row" style="justify-content:center;margin-top:18px;">
+            <button class="btn" id="checkBtn">Check</button>
+            <button class="btn secondary" id="skipBtn">Skip</button>
+          </div>
+          <div class="progress-track" id="dots"></div>
+        </div>
+      `;
+      renderDots();
+      const input = $('#dInput');
+      input.focus();
+      $('#sayBtn').addEventListener('click', () => window.Audio2.speakWord(w.en));
+      const check = () => {
+        const ans = input.value.trim();
+        if (!ans) return;
+        const correct = ans.toLowerCase() === w.en.toLowerCase();
+        const r = window.Store.recordAnswer(correct);
+        animateScore(r.delta);
+        refreshScore();
+        const fb = $('#fb');
+        if (correct) {
+          fb.className = 'feedback ok';
+          fb.innerHTML = `✓ Correct! <b>${esc(w.en)}</b>`;
+          window.Store.setErrorField(w.en, { correctCount: (w.correctCount || 0) + 1 });
+          window.Store.bump('wordsReviewed');
+          dots[idx] = 'ok';
+        } else {
+          fb.className = 'feedback bad';
+          fb.innerHTML = `✗ Correct answer: <b>${esc(w.en)}</b> (you wrote "${esc(ans)}")`;
+          window.Store.setErrorField(w.en, { wrongCount: (w.wrongCount || 0) + 1 });
+          dots[idx] = 'bad';
+          $('#dInput').classList.add('shake');
+        }
+        renderDots();
+        input.disabled = true;
+        $('#checkBtn').textContent = idx + 1 < queue.length ? 'Next →' : 'Finish ✓';
+        $('#checkBtn').onclick = next;
+      };
+      const next = () => {
+        idx++;
+        if (idx >= queue.length) { finishSession(); return; }
+        draw();
+      };
+      $('#checkBtn').addEventListener('click', check);
+      $('#skipBtn').addEventListener('click', next);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          if (input.disabled) next(); else check();
+        }
+      });
+    };
+    const renderDots = () => {
+      $('#dots').innerHTML = dots.map(d => `<span class="dot ${d}"></span>`).join('');
+    };
+    const finishSession = () => {
+      window.Store.setDayField('reviewDone', true);
+      const d = window.Store.getDay();
+      view.innerHTML = `
+        <h1 class="page-title">Session Complete 🎉</h1>
+        <div class="card" style="max-width:560px;margin:0 auto;text-align:center;">
+          <div class="grid grid-3">
+            <div class="stat"><div class="num">${d.correct}</div><div class="lbl">CORRECT</div></div>
+            <div class="stat"><div class="num">${d.wrong}</div><div class="lbl">WRONG</div></div>
+            <div class="stat"><div class="num" style="color:${d.score < 0 ? 'var(--bad)' : 'inherit'}">${d.score}</div><div class="lbl">TODAY'S SCORE</div></div>
+          </div>
+          <p class="muted" style="margin-top:14px;">${d.score < 0 ? '⚠️ Today is Unqualified (score below 0). Practise more!' : 'Nice job — keep the streak going!'}</p>
+          <div class="row" style="justify-content:center;margin-top:14px;">
+            <button class="btn" data-go="dictation">Again</button>
+            <button class="btn secondary" data-go="cards">Flip Cards</button>
+            <button class="btn secondary" data-go="dashboard">Home</button>
+          </div>
+        </div>`;
+      view.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+    };
+    draw();
+  }
+
+  /* ============================================================
+     ERROR BANK (add words + fuzzy suggest → confirm)
+     ============================================================ */
+  function renderBank() {
+    renderBankList();
+  }
+  function renderBankList(suggestMsg = '') {
+    const errors = window.Store.getErrors();
+    const list = errors.length
+      ? `<ul class="word-list">${errors.map(w => `
+          <li class="word-item ${w.mastered ? 'mastered' : ''}">
+            <span class="w">${esc(w.en)}</span>
+            ${w.misspelled ? `<span class="tag">was: ${esc(w.misspelled)}</span>` : ''}
+            <span class="m">${esc(w.cn)}</span>
+            ${w.seeded ? '<span class="badge">seed</span>' : ''}
+            <button class="btn small ghost" data-say="${esc(w.en)}">🔊</button>
+            <button class="btn small ghost" data-master="${esc(w.en)}">${w.mastered ? '↺' : '✓'}</button>
+            <button class="icon-x" data-del="${esc(w.en)}" title="remove">✕</button>
+          </li>`).join('')}</ul>`
+      : emptyHTML('No error words', 'Add a word you often misspell below.');
+
+    view.innerHTML = `
+      <h1 class="page-title">Error Bank</h1>
+      <p class="page-sub">Type a word you got wrong. We'll suggest the correct spelling for you to confirm.</p>
+
+      <div class="card section">
+        <h3>➕ Add a Word</h3>
+        <div class="row">
+          <input id="bkWord" class="input" placeholder="English word (misspelled is OK)" autocomplete="off" spellcheck="false" style="flex:2;" />
+          <input id="bkCn" class="input" placeholder="中文意思 / meaning" style="flex:2;" />
+          <button class="btn" id="bkAdd">Add</button>
+        </div>
+        <div id="suggestArea" style="margin-top:10px;">${suggestMsg}</div>
+      </div>
+
+      <div class="card section">
+        <h3>📚 My Error Words (${errors.length})</h3>
+        ${list}
+      </div>
+    `;
+    view.querySelectorAll('[data-say]').forEach(b => b.addEventListener('click', () => window.Audio2.speakWord(b.dataset.say)));
+    view.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+      window.Store.removeError(b.dataset.del);
+      renderBankList();
+      toast('Removed', '');
+    }));
+    view.querySelectorAll('[data-master]').forEach(b => b.addEventListener('click', () => {
+      const en = b.dataset.master;
+      const w = window.Store.getErrors().find(x => x.en === en);
+      window.Store.setErrorField(en, { mastered: !w.mastered });
+      renderBankList();
+    }));
+    $('#bkAdd').addEventListener('click', handleAdd);
+    $('#bkWord').addEventListener('keydown', e => { if (e.key === 'Enter') $('#bkCn').focus(); });
+    $('#bkCn').addEventListener('keydown', e => { if (e.key === 'Enter') handleAdd(); });
+  }
+
+  function handleAdd() {
+    const wordEl = $('#bkWord'), cnEl = $('#bkCn');
+    const typed = wordEl.value.trim();
+    const cn = cnEl.value.trim();
+    if (!typed) { toast('Type a word first', 'bad'); return; }
+
+    // exact match to a correct spelling in bank?
+    const exact = window.IELTS.BANK.find(w => w.en.toLowerCase() === typed.toLowerCase());
+    if (exact) {
+      const ok = window.Store.addError({ en: exact.en, cn: cn || exact.cn });
+      finishAdd(ok, wordEl, cnEl);
+      return;
+    }
+    // fuzzy suggest
+    const sugg = window.Fuzzy.suggestFromBank(typed);
+    if (sugg) {
+      const bankWord = getWordFromBank(sugg.word);
+      const cnForSugg = cn || (bankWord ? bankWord.cn : '');
+      const html = `
+        <div class="banner review" style="margin:0;">
+          <div>Did you mean <b>${esc(sugg.word)}</b>? (${esc(bankWord ? bankWord.cn : '')})
+          <span class="muted" style="font-size:.8rem;">You typed "${esc(typed)}"</span></div>
+          <div class="row">
+            <button class="btn small" id="useSugg">Use "${esc(sugg.word)}"</button>
+            <button class="btn small secondary" id="keepMine">Keep "${esc(typed)}"</button>
+          </div>
+        </div>`;
+      const area = $('#suggestArea');
+      area.innerHTML = html;
+      $('#useSugg').addEventListener('click', () => {
+        const ok = window.Store.addError({ en: sugg.word, cn: cnForSugg, misspelled: typed });
+        finishAdd(ok, wordEl, cnEl);
+      });
+      $('#keepMine').addEventListener('click', () => {
+        const ok = window.Store.addError({ en: typed, cn: cn, misspelled: null });
+        finishAdd(ok, wordEl, cnEl);
+      });
+      return;
+    }
+    // no close match → keep as typed
+    const ok = window.Store.addError({ en: typed, cn: cn });
+    finishAdd(ok, wordEl, cnEl);
+  }
+  function finishAdd(ok, wordEl, cnEl) {
+    if (ok) {
+      window.Store.bump('wordsAdded');
+      toast('Added to error bank ✓', 'ok');
+      wordEl.value = ''; cnEl.value = ''; wordEl.focus();
+      renderBankList();
+    } else {
+      toast('Already in your error bank', 'bad');
+    }
+  }
+
+  /* ============================================================
+     CN → EN (phrase dictation — only Chinese module)
+     ============================================================ */
+  function renderCnEn() {
+    const phrases = window.Store.getPhrases();
+    view.innerHTML = `
+      <h1 class="page-title" style="color:var(--text);text-shadow:none;">中译英 · CN → EN</h1>
+      <p class="page-sub" style="color:var(--text-soft);text-shadow:none;">看中文，默写英文词组。做对 +1，做错 −3。</p>
+
+      <div class="card section">
+        <h3>➕ 添加待默写词组</h3>
+        <div class="row">
+          <input id="phEn" class="input" placeholder="英文词组 English phrase" style="flex:2;" />
+          <input id="phCn" class="input" placeholder="中文翻译 Chinese" style="flex:2;" />
+          <button class="btn" id="phAdd">添加</button>
+        </div>
+      </div>
+
+      <div class="card section" style="max-width:620px;margin:0 auto;">
+        <div class="row" style="justify-content:space-between;">
+          <span class="badge" id="phProg">Ready</span>
+          <button class="icon-btn" id="phSay">🔊</button>
+        </div>
+        <h2 class="word-cn" id="phQ" style="margin-top:14px;">点击下方按钮开始默写</h2>
+        <input id="phInput" class="input dictate-input" placeholder="输入英文词组..." disabled autocomplete="off" spellcheck="false" />
+        <div class="feedback" id="phFb"></div>
+        <div class="row" style="justify-content:center;margin-top:18px;">
+          <button class="btn" id="phStart">开始默写</button>
+          <button class="btn secondary" id="phCheck" disabled>核对</button>
+          <button class="btn ghost" id="phNext" disabled>下一个</button>
+        </div>
+      </div>
+
+      <div class="card section">
+        <h3>📚 我的词组库 (共 ${phrases.length})</h3>
+        <ul class="word-list">
+          ${phrases.map(p => `
+            <li class="word-item">
+              <span class="w">${esc(p.en)}</span>
+              <span class="m">${esc(p.cn)}</span>
+              ${p.added ? '<span class="tag">custom</span>' : '<span class="badge">built-in</span>'}
+              ${p.added ? `<button class="icon-x" data-delph="${esc(p.en)}" title="删除">✕</button>` : ''}
+            </li>`).join('')}
+        </ul>
+      </div>
+    `;
+
+    $('#phAdd').addEventListener('click', () => {
+      const en = $('#phEn').value.trim();
+      const cn = $('#phCn').value.trim();
+      if (!en || !cn) { toast('词组和中文都要填', 'bad'); return; }
+      const ok = window.Store.addPhrase({ en, cn });
+      if (ok) { toast('已添加 ✓', 'ok'); renderCnEn(); }
+      else toast('该词组已存在', 'bad');
+    });
+    view.querySelectorAll('[data-delph]').forEach(b => b.addEventListener('click', () => {
+      window.Store.removePhrase(b.dataset.delph);
+      renderCnEn();
+    }));
+
+    // dictation round
+    let round = [];
+    let i = 0;
+    const start = () => {
+      round = shuffle(phrases).slice(0, Math.min(10, phrases.length));
+      i = 0;
+      $('#phStart').textContent = '重新开始';
+      ask();
+    };
+    const ask = () => {
+      if (i >= round.length) { end(); return; }
+      const p = round[i];
+      $('#phProg').textContent = `${i + 1} / ${round.length}`;
+      $('#phQ').textContent = p.cn;
+      const inp = $('#phInput');
+      inp.value = ''; inp.disabled = false; inp.focus();
+      $('#phFb').textContent = ''; $('#phFb').className = 'feedback';
+      $('#phCheck').disabled = false; $('#phNext').disabled = true;
+      $('#phSay').onclick = () => window.Audio2.speakWord(p.en);
+    };
+    const check = () => {
+      const p = round[i];
+      const ans = $('#phInput').value.trim();
+      if (!ans) return;
+      const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+      const correct = norm(ans) === norm(p.en);
+      const r = window.Store.recordAnswer(correct);
+      animateScore(r.delta);
+      refreshScore();
+      const fb = $('#phFb');
+      if (correct) {
+        fb.className = 'feedback ok';
+        fb.innerHTML = `✓ 正确！`;
+        window.Store.bump('cnEnDone');
+      } else {
+        fb.className = 'feedback bad';
+        fb.innerHTML = `✗ 正确答案：<b>${esc(p.en)}</b>`;
+        $('#phInput').classList.add('shake');
+      }
+      $('#phInput').disabled = true;
+      $('#phCheck').disabled = true;
+      $('#phNext').disabled = false;
+    };
+    const end = () => {
+      const d = window.Store.getDay();
+      $('#phProg').textContent = '完成 ✓';
+      $('#phQ').innerHTML = `本轮完成！今日中译英累计：<b>${d.cnEnDone}</b>，今日得分：<b style="color:${d.score < 0 ? 'var(--bad)' : 'var(--ok)'}">${d.score}</b>`;
+      $('#phInput').value = ''; $('#phInput').disabled = true;
+      $('#phCheck').disabled = true; $('#phNext').disabled = true;
+    };
+    $('#phStart').addEventListener('click', start);
+    $('#phCheck').addEventListener('click', check);
+    $('#phNext').addEventListener('click', () => { i++; ask(); });
+    $('#phInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { if (!$('#phCheck').disabled) check(); else if (!$('#phNext').disabled) { i++; ask(); } }
+    });
+  }
+
+  /* ============================================================
+     ENCYCLOPEDIA (word flip cards + online fill + self-edit)
+     ============================================================ */
+  function renderEncyclopedia() {
+    view.innerHTML = `
+      <h1 class="page-title">Word Encyclopedia</h1>
+      <p class="page-sub">Flip a card for phonetics, definitions, examples, synonyms & etymology. Add your own examples.</p>
+      <div class="row section">
+        <input id="encSearch" class="input" placeholder="Search a word (e.g. poisonous)..." style="flex:1;" autocomplete="off" spellcheck="false" />
+        <button class="btn" id="encGo">Look Up</button>
+        <button class="btn secondary" id="encRandom">🎲 Random</button>
+      </div>
+      <div id="encResult" class="section"></div>
+    `;
+    const show = async (raw) => {
+      const word = (raw || '').trim();
+      if (!word) return;
+      const res = $('#encResult');
+      res.innerHTML = `<div class="card"><div class="muted">Looking up “${esc(word)}”…</div></div>`;
+      const local = getWordFromBank(word);
+      const online = await window.DictAPI.fetch(word);
+      const custom = window.Store.getSentences(word);
+
+      let phon = (local && local.phon) || (online && online.phon) || '';
+      let examples = [];
+      if (local && local.examples) examples = examples.concat(local.examples);
+      if (online && online.examples) examples = examples.concat(online.examples);
+      if (custom && custom.length) examples = examples.concat(custom);
+      examples = [...new Set(examples)];
+      if (examples.length < 5) examples.push('—'); // pad
+      const syn = [...new Set([...(local && local.synonyms || []), ...(online && online.synonyms || [])])].slice(0, 8);
+      const ant = [...new Set([...(local && local.antonyms || []), ...(online && online.antonyms || [])])].slice(0, 8);
+      const defs = (online && online.definitions) ? online.definitions.slice(0, 4) :
+        (local ? [{ pos: '', definition: local.cn, example: '' }] : []);
+      const etym = (local && local.etymology) || (online && online.origin) || '';
+      const cn = local ? local.cn : '';
+
+      res.innerHTML = `
+        <div class="card">
+          <div class="row" style="justify-content:space-between;">
+            <div>
+              <h2 style="font-size:1.8rem;">${esc(word)} ${phon ? `<span class="muted">${esc(phon)}</span>` : ''}</h2>
+              ${cn ? `<div class="muted">${esc(cn)}</div>` : ''}
+            </div>
+            <div class="row">
+              <button class="icon-btn" id="encSay">🔊</button>
+            </div>
+          </div>
+
+          ${defs.length ? `<h4 style="margin-top:14px;">Definitions</h4>
+            <ul style="margin:6px 0 6px 18px;line-height:1.6;">${defs.map(d =>
+              `<li>${d.pos ? `<i>(${esc(d.pos)})</i> ` : ''}${esc(d.definition)}</li>`).join('')}</ul>` : ''}
+
+          <h4 style="margin-top:10px;">Example Sentences <span class="muted" style="font-weight:400;font-size:.8rem;">(${examples.filter(e=>e&&e!=='—').length})</span></h4>
+          <ul id="exList" style="margin:6px 0 6px 18px;line-height:1.7;">${examples.map(e =>
+            `<li>${e === '—' ? '<span class="muted">No example yet — add your own below.</span>' : esc(e)}</li>`).join('')}</ul>
+          <div class="row" style="margin-top:6px;">
+            <input id="exInput" class="input" placeholder="Add your own example sentence..." style="flex:1;" />
+            <button class="btn small" id="exAdd">Add</button>
+          </div>
+
+          ${syn.length ? `<h4 style="margin-top:12px;">Synonyms</h4><div>${syn.map(s => `<span class="badge">${esc(s)}</span>`).join(' ')}</div>` : ''}
+          ${ant.length ? `<h4 style="margin-top:10px;">Antonyms</h4><div>${ant.map(s => `<span class="badge" style="background:var(--bad-bg);color:var(--bad);">${esc(s)}</span>`).join(' ')}</div>` : ''}
+          ${etym ? `<div class="flip-back etym" style="position:static;transform:none;background:var(--grad-soft);color:var(--c3);margin-top:12px;"><b>Etymology:</b> ${esc(etym)}</div>` : ''}
+          ${(!online) ? `<div class="muted" style="margin-top:10px;font-size:.8rem;">Offline or word not found — showing built-in data only.</div>` : ''}
+        </div>`;
+      $('#encSay').addEventListener('click', () => window.Audio2.speakWord(word));
+      $('#exAdd').addEventListener('click', () => {
+        const v = $('#exInput').value.trim();
+        if (!v) return;
+        window.Store.addSentence(word, v);
+        toast('Example added ✓', 'ok');
+        show(word); // re-render
+      });
+      $('#exInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#exAdd').click(); });
+    };
+    $('#encGo').addEventListener('click', () => show($('#encSearch').value));
+    $('#encRandom').addEventListener('click', () => {
+      const w = pick(window.IELTS.BANK);
+      $('#encSearch').value = w.en;
+      show(w.en);
+    });
+    $('#encSearch').addEventListener('keydown', e => { if (e.key === 'Enter') show($('#encSearch').value); });
+    // auto-show a random one
+    const w = pick(window.IELTS.BANK);
+    $('#encSearch').value = w.en;
+    show(w.en);
+  }
+
+  /* ============================================================
+     CARDS (similar pairs + flip)
+     ============================================================ */
+  function renderCards() {
+    view.innerHTML = `
+      <h1 class="page-title">Knowledge Cards</h1>
+      <p class="page-sub">Confusable pairs & random words. Tap to flip and contrast.</p>
+      <div class="row section">
+        <button class="btn" id="cdPairs">🔀 Similar Pairs</button>
+        <button class="btn secondary" id="cdWords">🎲 Random Words</button>
+      </div>
+      <div class="card-grid section" id="cdGrid"></div>
+    `;
+    const grid = $('#cdGrid');
+    const renderPairs = () => {
+      grid.innerHTML = '';
+      window.IELTS.PAIRS.forEach(pair => {
+        const wa = getWordFromBank(pair.a) || { en: pair.a, cn: '' };
+        const wb = getWordFromBank(pair.b) || { en: pair.b, cn: '' };
+        const card = el(`
+          <div class="flip-wrap">
+            <div class="flip-card">
+              <div class="flip-face flip-front">
+                <div class="big">${esc(pair.a)} <span style="opacity:.5">vs</span> ${esc(pair.b)}</div>
+                <div class="hint">tap to flip · 🔊</div>
+              </div>
+              <div class="flip-face flip-back">
+                <h4>${esc(pair.a)} / ${esc(pair.b)}</h4>
+                ${wa.cn || wb.cn ? `<div style="opacity:.9">${esc(wa.cn||'?')} · ${esc(wb.cn||'?')}</div>` : ''}
+                <div class="ex" style="margin-top:8px;">${esc(pair.note)}</div>
+              </div>
+            </div>
+          </div>`);
+        bindFlip(card, pair.a);
+        grid.appendChild(card);
+      });
+    };
+    const renderWords = () => {
+      grid.innerHTML = '';
+      const picks = shuffle(window.IELTS.BANK).slice(0, 8);
+      picks.forEach(w => grid.appendChild(buildFlipCard(w)));
+    };
+    $('#cdPairs').addEventListener('click', renderPairs);
+    $('#cdWords').addEventListener('click', renderWords);
+    renderPairs();
+  }
+
+  function buildFlipCard(w) {
+    const examples = (w.examples || []).slice(0, 2);
+    const wrap = el(`
+      <div class="flip-wrap">
+        <div class="flip-card">
+          <div class="flip-face flip-front">
+            <div class="big">${esc(w.en)}</div>
+            <div class="hint">${esc(w.cn || '')} · tap to flip · 🔊</div>
+          </div>
+          <div class="flip-face flip-back">
+            <h4>${esc(w.en)} <span class="phon">${esc(w.phon || '')}</span></h4>
+            ${examples.length ? examples.map(e => `<div class="ex">• ${esc(e)}</div>`).join('') : '<div class="ex">No example.</div>'}
+            ${w.etymology ? `<div class="etym"><b>Origin:</b> ${esc(w.etymology)}</div>` : ''}
+          </div>
+        </div>
+      </div>`);
+    bindFlip(wrap, w.en);
+    return wrap;
+  }
+  function bindFlip(wrap, word) {
+    const card = wrap.querySelector('.flip-card');
+    card.addEventListener('click', e => {
+      card.classList.toggle('flipped');
+      // tap-to-speak when on the front face (clicking the big word)
+      if (!card.classList.contains('flipped') || e.target.classList.contains('big')) {
+        // speak on flip
+      }
+      window.Audio2.speakWord(word);
+    });
+  }
+
+  /* ============================================================
+     STATS
+     ============================================================ */
+  function renderStats() {
+    const days = window.Store.getDayList();
+    const last = days.slice(-14);
+    const lineData = last.map(([k, d]) => ({ label: k.slice(5), value: d.score }));
+    const barData = last.slice(-7).map(([k, d]) => ({ label: k.slice(8), value: d.correct + d.wrong }));
+    const accData = last.slice(-7).map(([k, d]) => {
+      const tot = d.correct + d.wrong;
+      return { label: k.slice(8), value: tot ? Math.round(d.correct / tot * 100) : 0, color: '#10b981' };
+    });
+    const p = window.Store.getProgress();
+    const totalC = last.reduce((s, [, d]) => s + (d.correct || 0), 0);
+    const totalW = last.reduce((s, [, d]) => s + (d.wrong || 0), 0);
+    const acc = (totalC + totalW) ? Math.round(totalC / (totalC + totalW) * 100) : 0;
+
+    view.innerHTML = `
+      <h1 class="page-title">Statistics</h1>
+      <p class="page-sub">Your learning trends over the last two weeks.</p>
+      <div class="grid grid-4 section">
+        <div class="card stat"><div class="num">${acc}%</div><div class="lbl">ACCURACY (14D)</div></div>
+        <div class="card stat"><div class="num">${totalC}</div><div class="lbl">CORRECT (14D)</div></div>
+        <div class="card stat"><div class="num">${totalW}</div><div class="lbl">WRONG (14D)</div></div>
+        <div class="card stat"><div class="num">${p.longestStreak || 0} 🔥</div><div class="lbl">BEST STREAK</div></div>
+      </div>
+      <div class="card section"><h3>📈 Daily Score</h3><canvas id="cLine" height="220"></canvas></div>
+      <div class="grid grid-2 section">
+        <div class="card"><h3>🧩 Questions Answered (7D)</h3><canvas id="cBar" height="200"></canvas></div>
+        <div class="card"><h3>🎯 Daily Accuracy (7D)</h3><canvas id="cAcc" height="200"></canvas></div>
+      </div>
+    `;
+    setTimeout(() => {
+      const l = $('#cLine'); if (l) window.Charts.line(l, lineData);
+      const b = $('#cBar'); if (b) window.Charts.bar(b, barData);
+      const a = $('#cAcc'); if (a) window.Charts.bar(a, accData);
+    }, 30);
+  }
+
+  /* ============================================================
+     VOCABULARY (overview, search, export)
+     ============================================================ */
+  function renderVocab() {
+    const render = (q = '') => {
+      const ql = q.toLowerCase();
+      const bank = window.IELTS.BANK.filter(w =>
+        !ql || w.en.toLowerCase().includes(ql) || (w.cn || '').includes(q));
+      const errs = window.Store.getErrors().filter(w =>
+        !ql || w.en.toLowerCase().includes(ql) || (w.cn || '').includes(q));
+      const phrs = window.Store.getPhrases().filter(p =>
+        !ql || p.en.toLowerCase().includes(ql) || (p.cn || '').includes(q));
+      view.innerHTML = `
+        <h1 class="page-title">Vocabulary</h1>
+        <p class="page-sub">All built-in words, your error words and phrases in one place.</p>
+        <div class="row section">
+          <input id="vSearch" class="input" value="${esc(q)}" placeholder="Search English or 中文..." style="flex:1;" autocomplete="off" />
+          <button class="btn secondary" id="vExport">⬇ Export JSON</button>
+          <button class="btn ghost" id="vReset" title="Reset all local data">Reset</button>
+        </div>
+        <div class="grid grid-3 section">
+          <div class="card"><h3>IETLS Bank</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--c2)">${bank.length}</div></div>
+          <div class="card"><h3>Error Words</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--bad)">${errs.length}</div></div>
+          <div class="card"><h3>Phrases</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--ok)">${phrs.length}</div></div>
+        </div>
+        <div class="grid grid-2 section">
+          <div class="card">
+            <h3>📚 Bank Words</h3>
+            <div style="max-height:320px;overflow:auto;">
+              <ul class="word-list">${bank.map(w => `
+                <li class="word-item"><span class="w">${esc(w.en)}</span><span class="m">${esc(w.cn||'')}</span>
+                  <button class="btn small ghost" data-say="${esc(w.en)}">🔊</button></li>`).join('') || '<li class="muted">No match.</li>'}
+              </ul>
+            </div>
+          </div>
+          <div class="card">
+            <h3>📕 Error Bank</h3>
+            <div style="max-height:160px;overflow:auto;">
+              <ul class="word-list">${errs.map(w => `<li class="word-item"><span class="w">${esc(w.en)}</span><span class="m">${esc(w.cn||'')}</span></li>`).join('') || '<li class="muted">Empty.</li>'}</ul>
+            </div>
+            <h3 style="margin-top:12px;">💬 Phrases</h3>
+            <div style="max-height:160px;overflow:auto;">
+              <ul class="word-list">${phrs.map(p => `<li class="word-item"><span class="w">${esc(p.en)}</span><span class="m">${esc(p.cn||'')}</span></li>`).join('') || '<li class="muted">Empty.</li>'}</ul>
+            </div>
+          </div>
+        </div>`;
+      view.querySelectorAll('[data-say]').forEach(b => b.addEventListener('click', () => window.Audio2.speakWord(b.dataset.say)));
+      $('#vSearch').addEventListener('input', e => render(e.target.value));
+      $('#vExport').addEventListener('click', () => {
+        const data = window.Store.exportAll();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'ielts-errorbook-backup.json'; a.click();
+        URL.revokeObjectURL(url);
+        toast('Exported backup ✓', 'ok');
+      });
+      $('#vReset').addEventListener('click', () => {
+        if (confirm('Reset ALL local data (error bank, phrases, scores)? This cannot be undone.')) {
+          window.Store.resetAll();
+          window.Store.seedIfFirstRun();
+          toast('All data reset', '');
+          go('dashboard');
+        }
+      });
+    };
+    render('');
+  }
+
+  /* ============================================================
+     CALENDAR (check-in grid)
+     ============================================================ */
+  function renderCalendar() {
+    const p = window.Store.getProgress();
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const first = new Date(y, m, 1);
+    const startDow = first.getDay(); // 0 Sun
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const tKey = window.todayKey();
+    const heads = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+    let cells = '';
+    for (let i = 0; i < startDow; i++) cells += `<div class="cal-cell" style="background:transparent;"></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const day = p.days[dk];
+      let cls = '';
+      let pts = '';
+      if (day) {
+        cls = day.failed ? 'fail' : 'has';
+        pts = `<span class="pts">${day.score >= 0 ? '+' : ''}${day.score}</span>`;
+      }
+      if (dk === tKey) cls += ' today';
+      cells += `<div class="cal-cell ${cls}">${d}${pts}</div>`;
+    }
+
+    const qualified = Object.values(p.days).filter(d => d.score >= 0 && (d.correct + d.wrong) > 0).length;
+    const failed = Object.values(p.days).filter(d => d.failed).length;
+
+    view.innerHTML = `
+      <h1 class="page-title">Check-in Calendar</h1>
+      <p class="page-sub">${now.toLocaleString('en-US', { month: 'long', year: 'numeric' })} · green = qualified, red = unqualified (score &lt; 0)</p>
+      <div class="grid grid-3 section">
+        <div class="card stat"><div class="num">${qualified}</div><div class="lbl">QUALIFIED DAYS</div></div>
+        <div class="card stat"><div class="num" style="color:var(--bad)">${failed}</div><div class="lbl">UNQUALIFIED DAYS</div></div>
+        <div class="card stat"><div class="num">${p.streak || 0} 🔥</div><div class="lbl">CURRENT STREAK</div></div>
+      </div>
+      <div class="card section">
+        <div class="cal-grid">${heads.map(h => `<div class="cal-head">${h}</div>`).join('')}${cells}</div>
+      </div>
+    `;
+  }
+
+  /* ----------------------------- helpers ----------------------------- */
+  function emptyHTML(title, msg) {
+    return `<div class="empty"><span class="ico">📭</span><div>${esc(title)}</div><div class="muted" style="margin-top:4px;">${esc(msg)}</div></div>`;
+  }
+  function emptyState(title, msg, btnLabel, route) {
+    return `<div class="card" style="max-width:560px;margin:40px auto;text-align:center;">
+      <div class="empty"><span class="ico">📭</span><div>${esc(title)}</div><div class="muted" style="margin-top:4px;">${esc(msg)}</div></div>
+      <button class="btn" style="margin-top:16px;" data-go="${route}">${esc(btnLabel)}</button>
+    </div>`;
+  }
+
+  /* ============================================================
+     BOOT
+     ============================================================ */
+  function boot() {
+    window.Store.seedIfFirstRun();
+    window.Audio2.init();
+    refreshScore();
+
+    // tab clicks
+    document.querySelectorAll('.tab').forEach(t => {
+      if (t.dataset.route) t.addEventListener('click', () => go(t.dataset.route));
+    });
+    $('#brand') && $('#brand');
+    document.querySelector('.brand').addEventListener('click', () => go('dashboard'));
+    // mobile "more"
+    $('#moreToggle').addEventListener('click', () => $('#tabs').classList.toggle('open'));
+    // sound toggle
+    const sBtn = $('#soundToggle');
+    const syncSound = () => {
+      const on = window.Audio2.enabled();
+      sBtn.classList.toggle('off', !on);
+      sBtn.textContent = on ? '🔊' : '🔇';
+    };
+    syncSound();
+    sBtn.addEventListener('click', () => { window.Audio2.toggle(); syncSound(); });
+
+    // route from hash
+    const hash = location.hash.replace('#', '');
+    go(ROUTES[hash] ? hash : 'dashboard');
+  }
+
+  document.addEventListener('DOMContentLoaded', boot);
+})();
