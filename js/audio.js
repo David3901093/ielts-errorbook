@@ -102,19 +102,57 @@ const Audio2 = {
     }
   },
 
-  /* Speak a single word: prefer API audio, fall back to TTS. */
+  /* Speak a single word. Order of attempts (most reliable on HarmonyOS first):
+     1. howjsay CloudFront CDN  (plain <audio src>, 99% coverage, no CORS/fetch needed)
+     2. dictionaryapi.dev audio (fixed: scans all phonetics entries)
+     3. Web Speech TTS           (last resort — fails on HarmonyOS, but works elsewhere) */
   async speakWord(word) {
     Diag.log('audio', 'speakWord() requested', { word, enabled: this.enabled(), unlocked: this._unlocked });
     if (!word || !this.enabled()) {
       Diag.log('audio', 'speakWord aborted', { reason: !word ? 'empty word' : 'sound disabled' });
       return;
     }
-    const played = await this._playApiAudio(word);
-    Diag.log('audio', 'API audio result', { word, played });
-    if (played) return;
+
+    // 1) howjsay CDN — direct mp3, lowercase, multi-word → %20
+    const howjsay = 'https://d1qx7pbj0dvboc.cloudfront.net/' +
+      encodeURIComponent(word.toLowerCase().trim()) + '.mp3';
+    Diag.log('audio', 'trying howjsay CDN', { word, url: howjsay });
+    if (await this._playUrl(howjsay, word, 'howjsay')) return;
+
+    // 2) dictionaryapi.dev (fixed parse)
+    Diag.log('audio', 'trying dictionaryapi.dev', { word });
+    if (await this._playApiAudio(word)) return;
+
+    // 3) TTS fallback
     Diag.log('audio', 'falling back to TTS', { word });
     if (this.speak(word)) return;
     Diag.log('audio', 'ALL play methods failed', { word });
+  },
+
+  /* Play a direct audio URL via <audio> element. Resolves true if it played. */
+  _playUrl(url, word, source) {
+    return new Promise(resolve => {
+      try {
+        const a = new Audio(url);
+        let settled = false;
+        const done = (ok, info) => {
+          if (settled) return; settled = true;
+          Diag.log('audio', `<audio:${source}> outcome`, { word, ok, ...info });
+          resolve(ok);
+        };
+        a.onended = () => done(true, { event: 'ended' });
+        a.onerror = () => done(false, { event: 'error', code: a.error ? a.error.code : 'n/a' });
+        setTimeout(() => done(false, { event: 'timeout' }), 5000);
+        const p = a.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => Diag.log('audio', `<audio:${source}> play() resolved`, { word }))
+           .catch(err => done(false, { event: 'play() rejected', message: String(err && err.message || err), name: String(err && err.name || '') }));
+        }
+      } catch (e) {
+        Diag.log('audio', `<audio:${source}> threw`, { word, error: String(e) });
+        resolve(false);
+      }
+    });
   },
 
   /* Fetch + play the dictionary API audio via <audio>. */
@@ -123,13 +161,13 @@ const Audio2 = {
     if (!key) return false;
     let entry = this._audioCache.get(key);
     if (entry === undefined) {
-      Diag.log('audio', 'fetching API audio url', { word });
+      Diag.log('audio', 'fetching dictionaryapi.dev audio url', { word });
       try {
         const data = await window.DictAPI.fetch(word);
         entry = (data && data.audio) ? data.audio : null;
-        Diag.log('audio', 'API audio url', { word, found: !!entry, url: entry || '' });
+        Diag.log('audio', 'dictionaryapi.dev audio url', { word, found: !!entry, url: entry || '' });
       } catch (e) {
-        Diag.log('audio', 'API fetch error', { word, error: String(e) });
+        Diag.log('audio', 'dictionaryapi.dev fetch error', { word, error: String(e) });
         entry = null;
       }
       this._audioCache.set(key, entry);
@@ -137,30 +175,7 @@ const Audio2 = {
     const url = entry;
     if (!url) return false;
     const full = url.startsWith('//') ? 'https:' + url : url;
-    return new Promise(resolve => {
-      try {
-        const a = new Audio(full);
-        let settled = false;
-        const done = (ok, info) => {
-          if (settled) return; settled = true;
-          Diag.log('audio', '<audio> outcome', { word, ok, ...info });
-          resolve(ok);
-        };
-        a.onended = () => done(true, { event: 'ended' });
-        a.onerror = (e) => done(false, { event: 'error', code: a.error ? a.error.code : 'n/a', message: a.error ? a.error.message : '' });
-        setTimeout(() => done(false, { event: 'timeout' }), 4000);
-        const p = a.play();
-        if (p && typeof p.then === 'function') {
-          p.then(() => Diag.log('audio', '<audio> play() promise resolved', { word }))
-           .catch(err => done(false, { event: 'play() rejected', message: String(err && err.message || err), name: String(err && err.name || '') }));
-        } else {
-          Diag.log('audio', '<audio> play() returned synchronously (no promise)', { word });
-        }
-      } catch (e) {
-        Diag.log('audio', '<audio> threw', { word, error: String(e) });
-        resolve(false);
-      }
-    });
+    return this._playUrl(full, word, 'dictapi');
   }
 };
 
