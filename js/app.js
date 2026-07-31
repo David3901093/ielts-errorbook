@@ -73,8 +73,11 @@
     currentRoute = route;
     document.querySelectorAll('.tab').forEach(t =>
       t.classList.toggle('active', t.dataset.route === route));
-    // collapse mobile "more" menu
-    $('#tabs').classList.remove('open');
+    // collapse mobile "more" menu and reset its label
+    const tabs = $('#tabs');
+    tabs.classList.remove('open');
+    const moreBtn = document.getElementById('moreToggle');
+    if (moreBtn) moreBtn.textContent = 'More ▾';
     view.scrollTop = 0;
     ROUTES[route]();
     refreshScore();
@@ -186,21 +189,74 @@
      DICTATION (random error words) + daily review mode
      ============================================================ */
   function renderDictation() {
+    showDictationPicker();
+  }
+
+  /* Word-list picker: choose a vocabulary level (or the error bank) to dictate. */
+  function showDictationPicker() {
     const errors = window.Store.getErrors().filter(e => !e.mastered);
-    if (!errors.length) {
-      view.innerHTML = emptyState('No error words yet',
-        'Add words you keep misspelling to the Error Bank, or they will appear here after you add them.',
-        'Go to Error Bank', 'bank');
+    const TS = window.IELTS.TAG_STATS || {};
+    const lists = [
+      { key: 'errors',  label: '📕 Error Bank',        count: errors.length, desc: 'Your personal misspelled words' },
+      { key: 'ielts',   label: '📘 IELTS 雅思',         count: TS.ielts || 0, desc: 'IELTS core vocabulary' },
+      { key: 'toefl',   label: '📗 TOEFL 托福',         count: TS.toefl || 0, desc: 'TOEFL vocabulary' },
+      { key: 'cet4',    label: '📙 CET-4 四级',         count: TS.cet4  || 0, desc: 'College English Test Band 4' },
+      { key: 'cet6',    label: '📓 CET-6 六级',         count: TS.cet6  || 0, desc: 'College English Test Band 6' },
+      { key: 'ky',      label: '📔 考研',               count: TS.ky    || 0, desc: 'Postgraduate entrance exam' }
+    ];
+    view.innerHTML = `
+      <h1 class="page-title">Dictation</h1>
+      <p class="page-sub">Pick a word list to practise. Type the English for each meaning. <b>+1</b> correct, <b>−3</b> wrong.</p>
+      <div class="grid grid-2 section">
+        ${lists.map(l => `
+          <div class="card list-pick ${l.count === 0 ? 'disabled' : ''}" data-list="${l.key}">
+            <div class="row" style="justify-content:space-between;align-items:flex-start;">
+              <div>
+                <h3 style="margin:0;">${l.label}</h3>
+                <div class="muted" style="margin-top:4px;">${esc(l.desc)}</div>
+              </div>
+              <span class="badge">${l.count.toLocaleString()} words</span>
+            </div>
+            <button class="btn small" style="margin-top:14px;" ${l.count === 0 ? 'disabled' : ''}>Start →</button>
+          </div>`).join('')}
+      </div>
+    `;
+    view.querySelectorAll('.list-pick').forEach(card => {
+      if (card.classList.contains('disabled')) return;
+      card.addEventListener('click', () => startDictation(card.dataset.list, errors));
+    });
+  }
+
+  /* Build the word queue for the chosen list and run a session. */
+  function startDictation(listKey, errors) {
+    let pool = [];
+    let label = '';
+    if (listKey === 'errors') {
+      pool = errors;
+      label = 'Error Bank';
+    } else {
+      pool = window.IELTS.BANK.filter(w => (w.tags || '').split(/\s+/).includes(listKey) && w.cn);
+      const names = { ielts: 'IELTS', toefl: 'TOEFL', cet4: 'CET-4', cet6: 'CET-6', ky: '考研' };
+      label = names[listKey] || listKey;
+    }
+    if (!pool.length) {
+      toast('No words in this list', 'bad');
+      showDictationPicker();
       return;
     }
-    const queue = shuffle(errors).slice(0, Math.min(10, errors.length));
+    const queue = shuffle(pool).slice(0, Math.min(10, pool.length));
+    runDictationSession(queue, label, listKey);
+  }
+
+  /* The actual per-word dictation loop (shared by all lists). */
+  function runDictationSession(queue, label, listKey) {
     let idx = 0;
     let dots = queue.map(() => '');
 
     const draw = () => {
       const w = queue[idx];
       view.innerHTML = `
-        <h1 class="page-title">Dictation</h1>
+        <h1 class="page-title">Dictation · ${esc(label)}</h1>
         <p class="page-sub">Type the English word for the meaning shown. <b>+1</b> correct, <b>−3</b> wrong.</p>
         <div class="card dictate-box dictate-card" style="max-width:560px;margin-left:auto;margin-right:auto;">
           <div class="row card-top" style="justify-content:space-between;">
@@ -214,6 +270,7 @@
           <div class="row" style="justify-content:center;margin-top:18px;">
             <button class="btn" id="checkBtn">Check</button>
             <button class="btn secondary" id="skipBtn">Skip</button>
+            <button class="btn ghost" id="backBtn">◂ Lists</button>
           </div>
           <div class="progress-track" id="dots"></div>
         </div>
@@ -222,6 +279,7 @@
       const input = $('#dInput');
       input.focus();
       $('#sayBtn').addEventListener('click', () => window.Audio2.speakWord(w.en));
+      $('#backBtn').addEventListener('click', () => showDictationPicker());
       const check = () => {
         const ans = input.value.trim();
         if (!ans) return;
@@ -267,11 +325,12 @@
       $('#dots').innerHTML = dots.map(d => `<span class="dot ${d}"></span>`).join('');
     };
     const finishSession = () => {
-      window.Store.setDayField('reviewDone', true);
+      if (label === 'Error Bank') window.Store.setDayField('reviewDone', true);
       const d = window.Store.getDay();
       view.innerHTML = `
         <h1 class="page-title">Session Complete 🎉</h1>
         <div class="card" style="max-width:560px;margin:0 auto;text-align:center;">
+          <div class="badge" style="margin-bottom:10px;">${esc(label)} list</div>
           <div class="grid grid-3">
             <div class="stat"><div class="num">${d.correct}</div><div class="lbl">CORRECT</div></div>
             <div class="stat"><div class="num">${d.wrong}</div><div class="lbl">WRONG</div></div>
@@ -279,11 +338,13 @@
           </div>
           <p class="muted" style="margin-top:14px;">${d.score < 0 ? '⚠️ Today is Unqualified (score below 0). Practise more!' : 'Nice job — keep the streak going!'}</p>
           <div class="row" style="justify-content:center;margin-top:14px;">
-            <button class="btn" data-go="dictation">Again</button>
-            <button class="btn secondary" data-go="cards">Flip Cards</button>
+            <button class="btn" id="againBtn">Again</button>
+            <button class="btn secondary" id="listsBtn">◂ Other Lists</button>
             <button class="btn secondary" data-go="dashboard">Home</button>
           </div>
         </div>`;
+      $('#againBtn').addEventListener('click', () => startDictation(listKey, window.Store.getErrors().filter(e => !e.mastered)));
+      $('#listsBtn').addEventListener('click', () => showDictationPicker());
       view.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
     };
     draw();
@@ -1077,8 +1138,16 @@
     });
     $('#brand') && $('#brand');
     document.querySelector('.brand').addEventListener('click', () => go('dashboard'));
-    // mobile "more"
-    $('#moreToggle').addEventListener('click', () => $('#tabs').classList.toggle('open'));
+    // mobile "more" — toggle the extra nav tabs and swap the label
+    const moreBtn = $('#moreToggle');
+    const syncMoreLabel = () => {
+      const open = $('#tabs').classList.contains('open');
+      moreBtn.textContent = open ? 'Less ▴' : 'More ▾';
+    };
+    moreBtn.addEventListener('click', () => {
+      $('#tabs').classList.toggle('open');
+      syncMoreLabel();
+    });
     // sound toggle
     const sBtn = $('#soundToggle');
     const syncSound = () => {
