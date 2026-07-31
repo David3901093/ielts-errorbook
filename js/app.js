@@ -583,50 +583,135 @@
   }
 
   /* ============================================================
-     CARDS (similar pairs + flip)
+     CARDS — dynamically generated synonym / antonym / confusable pairs.
+     No longer limited to a fixed 12; random sample each time, optionally
+     enriched from the online dictionary API.
      ============================================================ */
+
+  /* Build a list of synonym/antonym pairs from words that carry them
+     in the bank (hand-written + any previously fetched). */
+  function buildRelPairs(rel) {
+    const out = [];
+    window.IELTS.BANK.forEach(w => {
+      const list = w[rel] || [];
+      list.forEach(r => {
+        // only keep pairs where the related word is also a real-looking word
+        if (r && /^[a-zA-Z][a-zA-Z'\- ]*$/.test(r)) {
+          out.push({ a: w.en, b: r, cnA: w.cn || '', rel });
+        }
+      });
+    });
+    return out;
+  }
+
+  /* Lazily enrich a random batch of bank words with synonyms/antonyms from
+     the online dictionary API, then re-render. Silent on failure. */
+  async function enrichAndShow(rel, grid, count, loadingMsg) {
+    // 1) existing pairs first (instant)
+    let pool = buildRelPairs(rel);
+    // 2) if thin, fetch a few more from the API for random words
+    if (pool.length < count) {
+      grid.innerHTML = `<div class="card"><div class="muted">${loadingMsg}</div></div>`;
+      const candidates = shuffle(window.IELTS.BANK).slice(0, 12);
+      for (const w of candidates) {
+        if (pool.length >= count * 2) break;
+        try {
+          const data = await window.DictAPI.fetch(w.en);
+          if (data && data[rel] && data[rel].length) {
+            // cache into the bank object so we don't refetch
+            w[rel] = (w[rel] || []).concat(data[rel]);
+            w[rel] = [...new Set(w[rel])].slice(0, 8);
+            data[rel].slice(0, 3).forEach(r => {
+              if (/^[a-zA-Z][a-zA-Z'\- ]*$/.test(r)) {
+                pool.push({ a: w.en, b: r, cnA: w.cn || '', rel });
+              }
+            });
+          }
+        } catch (e) { /* silent */ }
+      }
+    }
+    showRelCards(pool, grid, count);
+  }
+
+  function showRelCards(pool, grid, count) {
+    grid.innerHTML = '';
+    if (!pool.length) {
+      grid.innerHTML = emptyHTML('No pairs yet', 'Try another mode, or check your connection to load more.');
+      return;
+    }
+    const picks = shuffle(pool).slice(0, count);
+    picks.forEach(p => {
+      const wa = getWordFromBank(p.a) || { en: p.a, cn: p.cnA };
+      const wb = getWordFromBank(p.b) || { en: p.b, cn: '' };
+      const relLabel = p.rel === 'synonyms' ? 'synonym' : 'antonym';
+      const relColor = p.rel === 'synonyms' ? 'var(--ok)' : 'var(--bad)';
+      const card = el(`
+        <div class="flip-wrap">
+          <div class="flip-card">
+            <div class="flip-face flip-front">
+              <div class="big">${esc(p.a)} <span style="opacity:.5">·</span> ${esc(p.b)}</div>
+              <div class="hint"><span class="badge" style="background:${relColor}22;color:${relColor};">${relLabel}</span> · tap to flip · 🔊</div>
+            </div>
+            <div class="flip-face flip-back">
+              <h4>${esc(p.a)} / ${esc(p.b)}</h4>
+              ${wa.cn || wb.cn ? `<div style="opacity:.9">${esc(wa.cn || '?')} · ${esc(wb.cn || '?')}</div>` : ''}
+              ${p.note ? `<div class="ex" style="margin-top:8px;">${esc(p.note)}</div>` : ''}
+              <div class="ex" style="margin-top:8px;opacity:.8;">${relLabel} pair — compare and contrast.</div>
+            </div>
+          </div>
+        </div>`);
+      bindFlip(card, p.a);
+      grid.appendChild(card);
+    });
+  }
+
   function renderCards() {
     view.innerHTML = `
       <h1 class="page-title">Knowledge Cards</h1>
-      <p class="page-sub">Confusable pairs & random words. Tap to flip and contrast.</p>
-      <div class="row section">
-        <button class="btn" id="cdPairs">🔀 Similar Pairs</button>
-        <button class="btn secondary" id="cdWords">🎲 Random Words</button>
+      <p class="page-sub">Synonyms, antonyms & confusable pairs — a fresh random set every click. Tap to flip.</p>
+      <div class="row section" style="flex-wrap:wrap;">
+        <button class="btn" id="cdSyn">🔀 Synonyms</button>
+        <button class="btn secondary" id="cdAnt">⚡ Antonyms</button>
+        <button class="btn secondary" id="cdConfuse">🤔 Confusable</button>
+        <button class="btn ghost" id="cdWords">🎲 Random Words</button>
+        <button class="btn ghost" id="cdShuffle">🔄 New Set</button>
       </div>
       <div class="card-grid section" id="cdGrid"></div>
     `;
     const grid = $('#cdGrid');
-    const renderPairs = () => {
-      grid.innerHTML = '';
-      window.IELTS.PAIRS.forEach(pair => {
-        const wa = getWordFromBank(pair.a) || { en: pair.a, cn: '' };
-        const wb = getWordFromBank(pair.b) || { en: pair.b, cn: '' };
-        const card = el(`
-          <div class="flip-wrap">
-            <div class="flip-card">
-              <div class="flip-face flip-front">
-                <div class="big">${esc(pair.a)} <span style="opacity:.5">vs</span> ${esc(pair.b)}</div>
-                <div class="hint">tap to flip · 🔊</div>
-              </div>
-              <div class="flip-face flip-back">
-                <h4>${esc(pair.a)} / ${esc(pair.b)}</h4>
-                ${wa.cn || wb.cn ? `<div style="opacity:.9">${esc(wa.cn||'?')} · ${esc(wb.cn||'?')}</div>` : ''}
-                <div class="ex" style="margin-top:8px;">${esc(pair.note)}</div>
-              </div>
-            </div>
-          </div>`);
-        bindFlip(card, pair.a);
-        grid.appendChild(card);
+    const COUNT = 8;
+    let currentMode = 'syn';
+
+    const modes = {
+      syn:    () => enrichAndShow('synonyms', grid, COUNT, 'Loading synonyms from the dictionary…'),
+      ant:    () => enrichAndShow('antonyms', grid, COUNT, 'Loading antonyms from the dictionary…'),
+      confuse:() => {
+        // curated confusable pairs, but a RANDOM sample each time
+        const pool = window.IELTS.PAIRS.map(p => ({
+          a: p.a, b: p.b, cnA: (getWordFromBank(p.a)||{}).cn || '', note: p.note, rel: 'confusable'
+        }));
+        showRelCards(pool, grid, COUNT);
+      },
+      words:  () => {
+        grid.innerHTML = '';
+        shuffle(window.IELTS.BANK).slice(0, COUNT).forEach(w => grid.appendChild(buildFlipCard(w)));
+      }
+    };
+    const setMode = (m) => {
+      currentMode = m;
+      // highlight active button
+      [['cdSyn','syn'],['cdAnt','ant'],['cdConfuse','confuse'],['cdWords','words']].forEach(([id,mm]) => {
+        const b = document.getElementById(id);
+        if (b) { b.classList.toggle('secondary', mm === m); b.classList.toggle('ghost', false); }
       });
+      modes[m]();
     };
-    const renderWords = () => {
-      grid.innerHTML = '';
-      const picks = shuffle(window.IELTS.BANK).slice(0, 8);
-      picks.forEach(w => grid.appendChild(buildFlipCard(w)));
-    };
-    $('#cdPairs').addEventListener('click', renderPairs);
-    $('#cdWords').addEventListener('click', renderWords);
-    renderPairs();
+    $('#cdSyn').addEventListener('click', () => setMode('syn'));
+    $('#cdAnt').addEventListener('click', () => setMode('ant'));
+    $('#cdConfuse').addEventListener('click', () => setMode('confuse'));
+    $('#cdWords').addEventListener('click', () => setMode('words'));
+    $('#cdShuffle').addEventListener('click', () => modes[currentMode]());
+    setMode('syn');
   }
 
   function buildFlipCard(w) {
