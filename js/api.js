@@ -35,13 +35,22 @@ const DictAPI = {
     }
   },
 
-  /* Normalise the API response into a compact shape. */
+  /* Normalise the API response into a compact shape.
+     Scan ALL entries (not just entries[0]) for audio — e.g. "ferry" stores
+     its audio URL in the 3rd phonetics entry of a later entry. */
   parse(entries) {
     if (!Array.isArray(entries) || !entries.length) return null;
     const e = entries[0];
+
+    // audio: search every entry's every phonetics for the first non-empty URL
+    let audio = '';
+    for (const ent of entries) {
+      const found = (ent.phonetics || []).map(p => p.audio).filter(Boolean)[0];
+      if (found) { audio = found; break; }
+    }
+
     const phonetics = (e.phonetics || []).filter(p => p.text);
     const phon = phonetics.length ? phonetics[0].text : (e.phonetic || '');
-    const audio = (e.phonetics || []).map(p => p.audio).filter(Boolean)[0] || '';
 
     const meanings = (e.meanings || []).map(m => ({
       partOfSpeech: m.partOfSpeech || '',
