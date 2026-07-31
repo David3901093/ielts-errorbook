@@ -532,18 +532,39 @@ const IELTS_WORDS = [
   { en: "acquire", cn: "获得" }
 ];
 
-/* Deduplicate by `en` (keep richest entry). */
+/* Deduplicate by `en` (keep richest entry).
+   Base layer = large auto-generated bank (window.__BANK, 5000+ words from
+   official IELTS/CET6 vocab). Overlay = hand-written IELTS_WORDS with richer
+   examples, etymology and synonyms for high-frequency words. */
 const IELTS_BANK = (() => {
   const map = new Map();
-  IELTS_WORDS.forEach(w => {
-    const key = w.en.toLowerCase();
+  const mergeIn = (w) => {
+    const key = (w.en || '').toLowerCase();
+    if (!key) return;
     if (!map.has(key)) map.set(key, { ...w });
     else {
       const old = map.get(key);
-      // merge fields, prefer existing richer data
-      ['phon','etymology','examples','synonyms','antonyms','cn'].forEach(f => {
-        if (!old[f] && w[f]) old[f] = w[f];
+      ['phon','etymology','examples','synonyms','antonyms','cn','def','pos','tags'].forEach(f => {
+        if ((!old[f] || (Array.isArray(old[f]) && !old[f].length)) && w[f]) old[f] = w[f];
       });
+    }
+  };
+  // 1) large base bank first
+  (window.__BANK || []).forEach(mergeIn);
+  // 2) then hand-written rich entries overlay (their richer fields win)
+  IELTS_WORDS.forEach(w => {
+    const key = w.en.toLowerCase();
+    if (map.has(key)) {
+      const old = map.get(key);
+      // hand-written fields replace/supplement base data
+      if (w.examples) old.examples = w.examples;
+      if (w.etymology) old.etymology = w.etymology;
+      if (w.synonyms) old.synonyms = w.synonyms;
+      if (w.antonyms) old.antonyms = w.antonyms;
+      if (w.phon) old.phon = w.phon;
+      if (w.cn) old.cn = w.cn; // prefer the concise hand-written Chinese
+    } else {
+      mergeIn(w);
     }
   });
   return Array.from(map.values());
