@@ -1,63 +1,62 @@
 /* ============================================================
-   audio.js — pronunciation with broad mobile compatibility.
-   Strategy (most reliable first on HarmonyOS/移动端):
-     1. Dictionary API real-human audio via <audio> element
-        (mobile browsers play <audio> from a user gesture reliably)
-     2. Web Speech API (speechSynthesis) as fallback
-     3. Silent graceful degradation (never throw / never block learning)
-   Also unlocks the Web Audio context on first user gesture so later
-   speech calls are not blocked by mobile autoplay policies.
+   audio.js — pronunciation with broad mobile compatibility + logging.
+   Every playback attempt is logged via Diag so on-device failures
+   (e.g. HarmonyOS) can be diagnosed from the exported log.
+
+   Strategy:
+     1. Dictionary API real-human audio via <audio> (mobile-friendly)
+     2. Web Speech API (speechSynthesis) fallback
+     3. Silent graceful degradation (logs the reason, never throws)
    ============================================================ */
 
 const Audio2 = {
   _voice: null,
   _unlocked: false,
   _ttsAvailable: true,
-  _audioCache: new Map(),   // word -> {url, status} to avoid refetching
+  _audioCache: new Map(),
 
-  /* Pick a voice once voices load. Some mobile browsers (HarmonyOS) never
-     fire onvoiceschanged and report no voices — we tolerate that and still
-     try speechSynthesis (it may use a system default voice). */
   init() {
-    if (!('speechSynthesis' in window)) {
+    const hasSS = ('speechSynthesis' in window);
+    Diag.log('audio', 'init() called', { hasSpeechSynthesis: hasSS });
+    if (!hasSS) {
       this._ttsAvailable = false;
+      Diag.log('audio', 'speechSynthesis NOT available — TTS disabled');
       return;
     }
     const pick = () => {
       let voices = [];
       try { voices = speechSynthesis.getVoices() || []; } catch (e) { voices = []; }
+      Diag.log('audio', 'voices available', { count: voices.length, sample: voices.slice(0, 5).map(v => v.name + '/' + v.lang) });
       if (!voices.length) return;
       this._voice =
         voices.find(v => /en-GB/i.test(v.lang) && /female|natural|samantha/i.test(v.name)) ||
         voices.find(v => /en-GB/i.test(v.lang)) ||
         voices.find(v => /en-US/i.test(v.lang)) ||
         voices.find(v => /^en/i.test(v.lang)) || voices[0];
+      Diag.log('audio', 'selected voice', this._voice ? { name: this._voice.name, lang: this._voice.lang } : 'none');
     };
     pick();
     try {
       if (speechSynthesis.onvoiceschanged !== undefined) {
         speechSynthesis.onvoiceschanged = pick;
       }
-    } catch (e) { /* ignore */ }
-
-    // unlock on first user interaction (mobile autoplay policy)
+    } catch (e) { Diag.log('audio', 'onvoiceschanged setup error', String(e)); }
     this._setupUnlock();
   },
 
-  /* Resume/unlock audio on the first tap anywhere. Mobile browsers require
-     playback to originate from a user gesture; this primes the context. */
+  /* Prime audio context on first user gesture (mobile autoplay policy). */
   _setupUnlock() {
     if (this._unlocked) return;
     const unlock = () => {
       this._unlocked = true;
-      // a tiny no-op speech primes speechSynthesis on some mobile browsers
+      Diag.log('audio', 'context unlocked by user gesture', { event: 'touch/click' });
       try {
         if ('speechSynthesis' in window) {
           const u = new SpeechSynthesisUtterance(' ');
           u.volume = 0; u.rate = 9;
           speechSynthesis.speak(u);
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) { Diag.log('audio', 'unlock speak error', String(e)); }
       document.removeEventListener('touchstart', unlock);
       document.removeEventListener('click', unlock);
     };
@@ -65,61 +64,72 @@ const Audio2 = {
     document.addEventListener('click', unlock, { once: false, passive: true });
   },
 
-  enabled() {
-    return window.Store.getSettings().sound !== false;
-  },
+  enabled() { return window.Store.getSettings().sound !== false; },
 
   toggle() {
     const s = window.Store.getSettings();
     s.sound = s.sound === false;
     window.Store.saveSettings(s);
+    Diag.log('audio', 'sound toggled', { enabled: s.sound });
     return s.sound;
   },
 
-  /* Speak arbitrary text (a sentence/phrase) via Web Speech TTS. */
+  /* Speak arbitrary text via Web Speech TTS. Returns true if attempted. */
   speak(text) {
-    if (!text || !this.enabled() || !this._ttsAvailable) return false;
-    if (!('speechSynthesis' in window)) return false;
+    if (!text || !this.enabled() || !this._ttsAvailable) {
+      Diag.log('audio', 'speak() skipped', { reason: !text ? 'empty' : !this.enabled() ? 'disabled' : 'no TTS' });
+      return false;
+    }
+    if (!('speechSynthesis' in window)) {
+      Diag.log('audio', 'speak() no speechSynthesis');
+      return false;
+    }
     try {
-      // cancel anything queued (some mobile browsers stack utterances)
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'en-GB';
-      u.rate = 0.92;
-      u.pitch = 1;
+      u.rate = 0.92; u.pitch = 1;
       if (this._voice) u.voice = this._voice;
+      u.onstart = () => Diag.log('audio', 'TTS started', { text: text.slice(0, 40) });
+      u.onend = () => Diag.log('audio', 'TTS ended', { text: text.slice(0, 40) });
+      u.onerror = (ev) => Diag.log('audio', 'TTS error event', { error: ev.error || 'unknown', text: text.slice(0, 40) });
       speechSynthesis.speak(u);
+      Diag.log('audio', 'speak() queued', { text: text.slice(0, 40), hasVoice: !!this._voice });
       return true;
     } catch (e) {
+      Diag.log('audio', 'speak() threw', String(e));
       return false;
     }
   },
 
-  /* Play a single word/phrase. Prefer the dictionary API's real-human audio
-     (works well on HarmonyOS via <audio>), then fall back to TTS. */
+  /* Speak a single word: prefer API audio, fall back to TTS. */
   async speakWord(word) {
-    if (!word || !this.enabled()) return;
-
-    // 1) try real-human audio from the dictionary API
+    Diag.log('audio', 'speakWord() requested', { word, enabled: this.enabled(), unlocked: this._unlocked });
+    if (!word || !this.enabled()) {
+      Diag.log('audio', 'speakWord aborted', { reason: !word ? 'empty word' : 'sound disabled' });
+      return;
+    }
     const played = await this._playApiAudio(word);
+    Diag.log('audio', 'API audio result', { word, played });
     if (played) return;
-
-    // 2) fall back to TTS
+    Diag.log('audio', 'falling back to TTS', { word });
     if (this.speak(word)) return;
-
-    // 3) nothing worked — silent. (Never alert/throw on mobile.)
+    Diag.log('audio', 'ALL play methods failed', { word });
   },
 
-  /* Fetch the API audio URL (cached) and play via an <audio> element. */
+  /* Fetch + play the dictionary API audio via <audio>. */
   async _playApiAudio(word) {
     const key = word.toLowerCase().trim();
     if (!key) return false;
     let entry = this._audioCache.get(key);
     if (entry === undefined) {
+      Diag.log('audio', 'fetching API audio url', { word });
       try {
         const data = await window.DictAPI.fetch(word);
         entry = (data && data.audio) ? data.audio : null;
+        Diag.log('audio', 'API audio url', { word, found: !!entry, url: entry || '' });
       } catch (e) {
+        Diag.log('audio', 'API fetch error', { word, error: String(e) });
         entry = null;
       }
       this._audioCache.set(key, entry);
@@ -131,17 +141,23 @@ const Audio2 = {
       try {
         const a = new Audio(full);
         let settled = false;
-        const done = (ok) => { if (!settled) { settled = true; resolve(ok); } };
-        a.onended = () => done(true);
-        a.onerror = () => done(false);
-        // safety timeout: if it neither plays nor errors, resolve false
-        setTimeout(() => done(false), 4000);
-        // some mobile browsers return a promise from play()
+        const done = (ok, info) => {
+          if (settled) return; settled = true;
+          Diag.log('audio', '<audio> outcome', { word, ok, ...info });
+          resolve(ok);
+        };
+        a.onended = () => done(true, { event: 'ended' });
+        a.onerror = (e) => done(false, { event: 'error', code: a.error ? a.error.code : 'n/a', message: a.error ? a.error.message : '' });
+        setTimeout(() => done(false, { event: 'timeout' }), 4000);
         const p = a.play();
         if (p && typeof p.then === 'function') {
-          p.then(() => {/* playing */}).catch(() => done(false));
+          p.then(() => Diag.log('audio', '<audio> play() promise resolved', { word }))
+           .catch(err => done(false, { event: 'play() rejected', message: String(err && err.message || err), name: String(err && err.name || '') }));
+        } else {
+          Diag.log('audio', '<audio> play() returned synchronously (no promise)', { word });
         }
       } catch (e) {
+        Diag.log('audio', '<audio> threw', { word, error: String(e) });
         resolve(false);
       }
     });
