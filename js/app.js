@@ -716,12 +716,17 @@
 
   function buildFlipCard(w) {
     const examples = (w.examples || []).slice(0, 2);
+    // English definition may be long; show the first sense only, trimmed.
+    const def = (w.def || '').split(/(?<=[.;])\s*/)[0] || '';
+    const defShort = def.length > 110 ? def.slice(0, 107).trim() + '…' : def;
     const wrap = el(`
       <div class="flip-wrap">
         <div class="flip-card">
           <div class="flip-face flip-front">
             <div class="big">${esc(w.en)}</div>
-            <div class="hint">${esc(w.cn || '')} · tap to flip · 🔊</div>
+            ${w.cn ? `<div class="cn-meaning">${esc(w.cn)}</div>` : ''}
+            ${defShort ? `<div class="en-def">${esc(defShort)}</div>` : ''}
+            <div class="hint">tap to flip · 🔊</div>
           </div>
           <div class="flip-face flip-back">
             <h4>${esc(w.en)} <span class="phon">${esc(w.phon || '')}</span></h4>

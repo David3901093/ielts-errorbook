@@ -223,7 +223,7 @@ html, body {
 /* ============ FLIP CARDS ============ */
 .flip-wrap { perspective: 1200px; }
 .flip-card {
-  position: relative; width: 100%; min-height: 220px; cursor: pointer;
+  position: relative; width: 100%; min-height: 260px; cursor: pointer;
   transition: transform .6s; transform-style: preserve-3d;
 }
 .flip-card.flipped { transform: rotateY(180deg); }
@@ -241,15 +241,33 @@ html, body {
   background: var(--grad); color: #fff; transform: rotateY(180deg);
   box-shadow: var(--card-shadow);
 }
-.flip-front .big { font-size: 1.8rem; font-weight: 700; text-align: center; }
-.flip-front .hint { text-align: center; color: var(--text-mute); font-size: .82rem; margin-top: 8px; }
+.flip-front .big {
+  font-size: clamp(1.2rem, 3.2vw, 1.9rem);
+  font-weight: 700; text-align: center;
+  overflow-wrap: break-word; word-break: break-word; hyphens: auto;
+  line-height: 1.2; padding: 0 4px;
+}
+.flip-front .cn-meaning {
+  text-align: center; font-size: 1.02rem; color: var(--c2);
+  font-weight: 600; margin-top: 10px;
+  overflow-wrap: break-word; word-break: break-word;
+}
+.flip-front .en-def {
+  text-align: center; font-size: .82rem; color: var(--text-soft);
+  margin-top: 8px; line-height: 1.45;
+  overflow-wrap: break-word; word-break: break-word;
+}
+.flip-front .hint { text-align: center; color: var(--text-mute); font-size: .82rem; margin-top: 12px; }
 .flip-back h4 { font-size: 1.3rem; margin-bottom: 6px; }
 .flip-back .phon { opacity: .85; font-size: .9rem; margin-bottom: 10px; }
 .flip-back .ex { font-size: .88rem; margin: 4px 0; opacity: .95; }
 .flip-back .etym { font-size: .8rem; opacity: .8; margin-top: 8px; border-top: 1px solid rgba(255,255,255,.25); padding-top: 8px; }
 
-/* card grid */
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--gap); }
+/* card grid — wider cards so long words (e.g. 'advertisements') never overflow */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--gap); }
+/* home recommended cards: 3 equal columns, always wide enough for long words */
+#homeCards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+@media (max-width: 760px) { #homeCards { grid-template-columns: 1fr; } }
 
 /* ============ CALENDAR ============ */
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
