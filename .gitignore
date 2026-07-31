@@ -8,3 +8,7 @@ Thumbs.db
 # local backups
 *.local.json
 ielts-errorbook-backup.json
+
+# raw vocab source data (large, regenerated via scripts/build-bank.js)
+data-raw/
+js/bank.json
