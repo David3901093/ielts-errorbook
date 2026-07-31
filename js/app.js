@@ -107,10 +107,33 @@
     const yAdded = y ? y.wordsAdded : 0;
     const yAcc = y && (y.correct + y.wrong) > 0 ? Math.round((y.correct / (y.correct + y.wrong)) * 100) : '—';
 
+    const TS = window.IELTS.TAG_STATS || {};
+    const totalBank = window.IELTS.BANK.length;
+    // exam tags with friendly labels + order
+    const examTags = [
+      { tag: 'ielts', label: 'IELTS 雅思',   count: TS.ielts || 0 },
+      { tag: 'toefl', label: 'TOEFL 托福',   count: TS.toefl || 0 },
+      { tag: 'cet6',  label: 'CET-6 六级',   count: TS.cet6  || 0 },
+      { tag: 'cet4',  label: 'CET-4 四级',   count: TS.cet4  || 0 },
+      { tag: 'ky',    label: '考研',          count: TS.ky    || 0 },
+      { tag: 'gre',   label: 'GRE',          count: TS.gre   || 0 }
+    ];
+
     view.innerHTML = `
       <h1 class="page-title">Dashboard</h1>
       <p class="page-sub">Your daily IELTS training hub · ${today}</p>
       ${banner}
+
+      <div class="card section vocab-banner">
+        <div class="vocab-banner-top">
+          <h3>📚 Vocabulary Bank</h3>
+          <span class="vocab-total"><b>${totalBank.toLocaleString()}</b> words in total</span>
+        </div>
+        <div class="vocab-chips">
+          ${examTags.map(e => `<span class="vocab-chip"><b>${e.count.toLocaleString()}</b> ${e.label}</span>`).join('')}
+        </div>
+        <div class="muted" style="margin-top:8px;font-size:.8rem;">Words are cross-tagged across exams — one word may belong to several lists.</div>
+      </div>
 
       <div class="grid grid-4 section">
         <div class="card stat"><div class="num">${p.totalScore}</div><div class="lbl">TOTAL SCORE</div></div>

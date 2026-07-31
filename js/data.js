@@ -749,10 +749,23 @@ const SIMILAR_PAIRS = [
   { a: "council",    b: "counsel",   note: "council = 议会; counsel = 忠告/律师." }
 ];
 
+/* Compute per-exam-tag word counts from the bank (dynamic, always accurate).
+   Each bank word carries a `tags` string like "ielts cet6 ky toefl". */
+const TAG_STATS = (() => {
+  const counts = {};
+  IELTS_BANK.forEach(w => {
+    (w.tags || '').split(/\s+/).filter(Boolean).forEach(t => {
+      counts[t] = (counts[t] || 0) + 1;
+    });
+  });
+  return counts;
+})();
+
 /* Expose globally */
 window.IELTS = {
   BANK: IELTS_BANK,
   SEED_ERRORS: SEED_ERROR_WORDS,
   PHRASES: IELTS_PHRASES,
-  PAIRS: SIMILAR_PAIRS
+  PAIRS: SIMILAR_PAIRS,
+  TAG_STATS
 };

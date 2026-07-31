@@ -310,6 +310,21 @@ canvas { width: 100%; height: auto; display: block; }
 .flip-back .ex .say-inline { background: rgba(255,255,255,.2); color: #fff; margin-top: 1px; }
 .flip-back .ex .say-inline:hover { background: rgba(255,255,255,.35); }
 
+/* ============ VOCABULARY BANK BANNER (dashboard) ============ */
+.vocab-banner { background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(219,234,254,.85)); }
+.vocab-banner-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.vocab-banner-top h3 { margin: 0; }
+.vocab-total { color: var(--text-soft); font-size: .9rem; }
+.vocab-total b { color: var(--c2); font-size: 1.15rem; }
+.vocab-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.vocab-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--grad-soft); border: 1px solid rgba(37,99,235,.18);
+  color: var(--c3); padding: 7px 14px; border-radius: var(--radius-pill);
+  font-size: .85rem; font-weight: 500;
+}
+.vocab-chip b { color: var(--c2); font-size: 1rem; }
+
 /* ============ TOAST ============ */
 .toast {
   position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(40px);
