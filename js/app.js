@@ -1130,6 +1130,9 @@
   function boot() {
     window.Store.seedIfFirstRun();
     window.Audio2.init();
+    // capture browser environment for diagnostics (UA, TTS support, voices...)
+    window.Diag.captureEnv();
+    window.Diag.log('app', 'app booted', { route: location.hash });
     refreshScore();
 
     // tab clicks
@@ -1157,6 +1160,14 @@
     };
     syncSound();
     sBtn.addEventListener('click', () => { window.Audio2.toggle(); syncSound(); });
+
+    // diagnostic log download
+    const dBtn = $('#diagBtn');
+    if (dBtn) dBtn.addEventListener('click', () => {
+      window.Diag.captureEnv(); // refresh env at export time
+      const n = window.Diag.download();
+      toast('Diagnostic log downloaded (' + n + ' entries)', 'ok');
+    });
 
     // route from hash
     const hash = location.hash.replace('#', '');
