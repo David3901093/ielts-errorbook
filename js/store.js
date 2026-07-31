@@ -161,23 +161,26 @@ const Store = {
   getSettings() { return read(KEY.settings, { sound: true, seeded: false }); },
   saveSettings(s) { write(KEY.settings, s); },
 
-  /* ---------- Seed error bank on first run ---------- */
+  /* ---------- Seed error bank (idempotent merge) ----------
+     Always ensures every built-in red-word seed exists, without
+     duplicating or overwriting student-added data. New seeds added in
+     later versions are back-filled for existing users too. */
   seedIfFirstRun() {
+    const existing = Store.getErrors();
+    let added = false;
+    window.IELTS.SEED_ERRORS.forEach(e => {
+      if (!existing.some(w => w.en.toLowerCase() === e.en.toLowerCase())) {
+        existing.push({
+          en: e.en, cn: e.cn, misspelled: e.misspelled,
+          correctCount: 0, wrongCount: 0, mastered: false,
+          added: todayKey(), seeded: true
+        });
+        added = true;
+      }
+    });
+    if (added) Store.saveErrors(existing);
     const s = Store.getSettings();
-    if (!s.seeded) {
-      const existing = Store.getErrors();
-      window.IELTS.SEED_ERRORS.forEach(e => {
-        if (!existing.some(w => w.en.toLowerCase() === e.en.toLowerCase())) {
-          existing.push({
-            en: e.en, cn: e.cn, misspelled: e.misspelled,
-            correctCount: 0, wrongCount: 0, mastered: false, added: todayKey(), seeded: true
-          });
-        }
-      });
-      Store.saveErrors(existing);
-      s.seeded = true;
-      Store.saveSettings(s);
-    }
+    if (!s.seeded) { s.seeded = true; Store.saveSettings(s); }
   },
 
   /* ---------- Export / import / reset ---------- */

@@ -529,7 +529,117 @@ const IELTS_WORDS = [
     ],
     synonyms: ["mistreat", "misuse"], antonyms: [] },
 
-  { en: "acquire", cn: "获得" }
+  { en: "acquire", cn: "获得" },
+
+  /* ---- Rich entries for newly-added red words (5+ examples each) ---- */
+  { en: "Brazilian", cn: "巴西的；巴西人",
+    examples: [
+      "She is a Brazilian student.",
+      "Brazilian coffee is famous worldwide.",
+      "The Brazilian football team won the cup.",
+      "He speaks Brazilian Portuguese.",
+      "Brazilian culture is vibrant and diverse."
+    ],
+    synonyms: ["of Brazil"], antonyms: [] },
+
+  { en: "toothpaste", cn: "牙膏",
+    examples: [
+      "I bought a new tube of toothpaste.",
+      "Squeeze some toothpaste onto the brush.",
+      "This toothpaste protects against cavities.",
+      "We ran out of toothpaste this morning.",
+      "Mint toothpaste freshens your breath."
+    ],
+    etymology: "tooth + paste (a soft moist mixture).",
+    synonyms: ["dentifrice"], antonyms: [] },
+
+  { en: "consequence", cn: "后果；结果",
+    examples: [
+      "He must face the consequences of his actions.",
+      "Pollution has serious consequences for health.",
+      "Think about the consequence before you act.",
+      "As a consequence, the project was delayed.",
+      "The economic consequences were severe."
+    ],
+    etymology: "From Latin consequi, con- + sequi 'to follow'.",
+    synonyms: ["result", "outcome"], antonyms: ["cause"] },
+
+  { en: "appeal", cn: "呼吁；上诉；吸引",
+    examples: [
+      "The charity made an appeal for donations.",
+      "She appealed against the court's decision.",
+      "The design has wide appeal.",
+      "They launched a fresh appeal to the public.",
+      "The idea appeals to me."
+    ],
+    etymology: "From Latin ad- + pellere 'to drive toward'.",
+    synonyms: ["plea", "attraction"], antonyms: [] },
+
+  { en: "controversial", cn: "有争议的",
+    examples: [
+      "Abortion is a controversial issue.",
+      "The film was highly controversial.",
+      "He made a controversial remark.",
+      "The policy proved controversial.",
+      "Controversial topics spark debate."
+    ],
+    etymology: "From Latin controversus, 'turned against'.",
+    synonyms: ["debatable", "disputed"], antonyms: ["undisputed"] },
+
+  { en: "strive", cn: "奋斗；努力",
+    examples: [
+      "We must strive for excellence.",
+      "She strove to finish on time.",
+      "They strive to reduce waste.",
+      "He strives hard to support his family.",
+      "Strive to be your best self."
+    ],
+    etymology: "From Old French estriver, of Germanic origin.",
+    synonyms: ["try", "endeavour"], antonyms: [] },
+
+  { en: "sculpture", cn: "雕塑；雕刻",
+    examples: [
+      "The museum has a famous sculpture.",
+      "She studied sculpture at art school.",
+      "The sculpture was carved from marble.",
+      "He sculpts in wood and stone.",
+      "Modern sculpture takes many forms."
+    ],
+    etymology: "From Latin sculpere, 'to carve'.",
+    synonyms: ["statue", "carving"], antonyms: [] },
+
+  { en: "embassy", cn: "大使馆",
+    examples: [
+      "She works at the British Embassy.",
+      "Protesters gathered outside the embassy.",
+      "He went to the embassy to renew his passport.",
+      "The embassy issued a travel warning.",
+      "Diplomats met at the embassy."
+    ],
+    etymology: "From Latin ambactus, via Old French; related to 'ambassador'.",
+    synonyms: ["mission", "consulate"], antonyms: [] },
+
+  { en: "costume", cn: "服装；装束",
+    examples: [
+      "The actors wore traditional costumes.",
+      "She wore a clown costume to the party.",
+      "The costume designer won an award.",
+      "National costumes vary by region.",
+      "He hired a costume for the play."
+    ],
+    etymology: "From Italian costume, from Latin consuetudo 'custom'.",
+    synonyms: ["outfit", "attire"], antonyms: [] },
+
+  { en: "parallel", cn: "平行的；相似处",
+    examples: [
+      "The two roads run parallel.",
+      "Draw a parallel line here.",
+      "There are clear parallels between the events.",
+      "Parallel parking is tricky.",
+      "Their careers developed in parallel."
+    ],
+    etymology: "From Greek parallēlos, para- + allēlōn 'one another'.",
+    synonyms: ["alongside", "matching"], antonyms: ["divergent"] }
 ];
 
 /* Deduplicate by `en` (keep richest entry).
@@ -570,13 +680,33 @@ const IELTS_BANK = (() => {
   return Array.from(map.values());
 })();
 
-/* Red words (seed for error bank) — correct spellings with the original misspelling. */
+/* Red words (seed for error bank) — ALL red words identified from yasi/ images.
+   Each carries the student's original misspelling (for the "was: ..." badge).
+   `img` records which worksheet image it came from. */
 const SEED_ERROR_WORDS = [
-  { en: "poisonous",   cn: "有毒的",  misspelled: "poisionous" },
-  { en: "academic",    cn: "学术的",  misspelled: "accedemic" },
-  { en: "theoretical", cn: "理论的",  misspelled: "theoritical" },
-  { en: "annually",    cn: "每年地",  misspelled: "anunally" },
-  { en: "Russia",      cn: "俄罗斯",  misspelled: "Russcia" }
+  // --- already had rich hand-written data ---
+  { en: "poisonous",    cn: "有毒的",    misspelled: "poisionous",   img: "7" },
+  { en: "academic",     cn: "学术的",    misspelled: "accedemic",    img: "8" },
+  { en: "theoretical",  cn: "理论的",    misspelled: "theoritical",  img: "12" },
+  { en: "annually",     cn: "每年地",    misspelled: "anunally",     img: "1" },
+  { en: "Russia",       cn: "俄罗斯",    misspelled: "Russcia",      img: "1" },
+
+  // --- newly added from all remaining red words across images ---
+  { en: "Brazilian",    cn: "巴西的；巴西人", misspelled: "Brazilain",    img: "1" },
+  { en: "toothpaste",   cn: "牙膏",     misspelled: "toothbrush",   img: "6" },
+  { en: "customs",      cn: "习俗；海关", misspelled: "custonms",    img: "7" },
+  { en: "consequence",  cn: "后果",     misspelled: "concquance",   img: "7" },
+  { en: "appeal",       cn: "呼吁；上诉", misspelled: "apeal",       img: "7" },
+  { en: "application",  cn: "申请；应用", misspelled: "appliction",   img: "8" },
+  { en: "controversial",cn: "有争议的",  misspelled: "conterversial",img: "8" },
+  { en: "strive",       cn: "奋斗；努力", misspelled: "strave",       img: "8" },
+  { en: "amusement",    cn: "娱乐",     misspelled: "ammusement",   img: "8" },
+  { en: "dioxide",      cn: "二氧化物",  misspelled: "dioxcide",     img: "8" },
+  { en: "sculpture",    cn: "雕塑",     misspelled: "scupclture",   img: "8" },
+  { en: "embassy",      cn: "大使馆",    misspelled: "ambassy",      img: "20" },
+  { en: "costume",      cn: "服装",     misspelled: "costunm",      img: "20" },
+  { en: "parallel",     cn: "平行的",    misspelled: "parallal",     img: "20" },
+  { en: "young",        cn: "年轻的",    misspelled: "yill",         img: "20" }
 ];
 
 /* ---- Built-in CN→EN phrases for daily dictation ---- */
