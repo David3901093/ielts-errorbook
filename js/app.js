@@ -250,7 +250,7 @@
           <div class="grid grid-3">
             <div class="stat"><div class="num">${d.correct}</div><div class="lbl">CORRECT</div></div>
             <div class="stat"><div class="num">${d.wrong}</div><div class="lbl">WRONG</div></div>
-            <div class="stat"><div class="num" style="color:${d.score < 0 ? 'var(--bad)' : 'inherit'}">${d.score}</div><div class="lbl">TODAY'S SCORE</div></div>
+            <div class="stat"><div class="num" style="color:${d.score < 0 ? 'var(--fail)' : 'inherit'}">${d.score}</div><div class="lbl">TODAY'S SCORE</div></div>
           </div>
           <p class="muted" style="margin-top:14px;">${d.score < 0 ? '⚠️ Today is Unqualified (score below 0). Practise more!' : 'Nice job — keep the streak going!'}</p>
           <div class="row" style="justify-content:center;margin-top:14px;">
@@ -481,7 +481,7 @@
     const end = () => {
       const d = window.Store.getDay();
       $('#phProg').textContent = '完成 ✓';
-      $('#phQ').innerHTML = `本轮完成！今日中译英累计：<b>${d.cnEnDone}</b>，今日得分：<b style="color:${d.score < 0 ? 'var(--bad)' : 'var(--ok)'}">${d.score}</b>`;
+      $('#phQ').innerHTML = `本轮完成！今日中译英累计：<b>${d.cnEnDone}</b>，今日得分：<b style="color:${d.score < 0 ? 'var(--fail)' : 'var(--ok)'}">${d.score}</b>`;
       $('#phInput').value = ''; $('#phInput').disabled = true;
       $('#phCheck').disabled = true; $('#phNext').disabled = true;
     };
@@ -886,10 +886,10 @@
 
     view.innerHTML = `
       <h1 class="page-title">Check-in Calendar</h1>
-      <p class="page-sub">${now.toLocaleString('en-US', { month: 'long', year: 'numeric' })} · green = qualified, red = unqualified (score &lt; 0)</p>
+      <p class="page-sub">${now.toLocaleString('en-US', { month: 'long', year: 'numeric' })} · <span style="color:var(--ok);font-weight:600;">green = qualified</span>, <span style="color:var(--fail);font-weight:600;">yellow = unqualified</span> (score &lt; 0)</p>
       <div class="grid grid-3 section">
         <div class="card stat"><div class="num">${qualified}</div><div class="lbl">QUALIFIED DAYS</div></div>
-        <div class="card stat"><div class="num" style="color:var(--bad)">${failed}</div><div class="lbl">UNQUALIFIED DAYS</div></div>
+        <div class="card stat"><div class="num" style="color:var(--fail)">${failed}</div><div class="lbl">UNQUALIFIED DAYS</div></div>
         <div class="card stat"><div class="num">${p.streak || 0} 🔥</div><div class="lbl">CURRENT STREAK</div></div>
       </div>
       <div class="card section">
