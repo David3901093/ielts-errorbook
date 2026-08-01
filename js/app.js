@@ -25,6 +25,14 @@
     clearTimeout(toast._t);
     toast._t = setTimeout(() => (t.className = 'toast'), 1800);
   }
+  /* Toast shown when sentence TTS is unavailable (e.g. HarmonyOS has no TTS engine). */
+  window._showAudioToast = function () {
+    const t = $('#toast');
+    t.innerHTML = '🔇 This browser does not support sentence audio. <br>Sentence TTS requires a system voice engine, which is unavailable here. Word pronunciation still works.';
+    t.className = 'toast show bad';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => (t.className = 'toast'), 5000);
+  };
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function shuffle(arr) {
     const a = [...arr];
@@ -73,11 +81,6 @@
     currentRoute = route;
     document.querySelectorAll('.tab').forEach(t =>
       t.classList.toggle('active', t.dataset.route === route));
-    // collapse mobile "more" menu and reset its label
-    const tabs = $('#tabs');
-    tabs.classList.remove('open');
-    const moreBtn = document.getElementById('moreToggle');
-    if (moreBtn) moreBtn.textContent = 'More ▾';
     view.scrollTop = 0;
     ROUTES[route]();
     refreshScore();
@@ -1130,9 +1133,6 @@
   function boot() {
     window.Store.seedIfFirstRun();
     window.Audio2.init();
-    // capture browser environment for diagnostics (UA, TTS support, voices...)
-    window.Diag.captureEnv();
-    window.Diag.log('app', 'app booted', { route: location.hash });
     refreshScore();
 
     // tab clicks
@@ -1141,16 +1141,6 @@
     });
     $('#brand') && $('#brand');
     document.querySelector('.brand').addEventListener('click', () => go('dashboard'));
-    // mobile "more" — toggle the extra nav tabs and swap the label
-    const moreBtn = $('#moreToggle');
-    const syncMoreLabel = () => {
-      const open = $('#tabs').classList.contains('open');
-      moreBtn.textContent = open ? 'Less ▴' : 'More ▾';
-    };
-    moreBtn.addEventListener('click', () => {
-      $('#tabs').classList.toggle('open');
-      syncMoreLabel();
-    });
     // sound toggle
     const sBtn = $('#soundToggle');
     const syncSound = () => {
@@ -1160,14 +1150,6 @@
     };
     syncSound();
     sBtn.addEventListener('click', () => { window.Audio2.toggle(); syncSound(); });
-
-    // diagnostic log download
-    const dBtn = $('#diagBtn');
-    if (dBtn) dBtn.addEventListener('click', () => {
-      window.Diag.captureEnv(); // refresh env at export time
-      const n = window.Diag.download();
-      toast('Diagnostic log downloaded (' + n + ' entries)', 'ok');
-    });
 
     // route from hash
     const hash = location.hash.replace('#', '');
