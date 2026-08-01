@@ -873,7 +873,7 @@
         </div>
         <button class="btn secondary" id="phSearchBtn">Search</button>
       </div>
-      <div id="phResults" style="margin-top:22px;"></div>
+      <div id="phResults" style="margin-top:28px;"></div>
     `;
     const resultsDiv = $('#phResults');
     const searchInput = $('#phSearch');
@@ -912,17 +912,17 @@
         return;
       }
       resultsDiv.innerHTML = `
-        <div class="muted" style="margin-bottom:12px;">${all.length} phrase${all.length > 1 ? 's' : ''} found</div>
-        <div class="card-grid">
-          ${all.map(p => `
-            <div class="card phrase-card" data-en="${esc(p.en)}">
-              <div class="row" style="justify-content:space-between;">
-                <h3 style="margin:0;font-size:1.05rem;">${esc(p.en)}</h3>
-                <button class="btn small ghost" data-say="${esc(p.en)}">🔊</button>
+        <div class="muted" style="margin-bottom:14px;">${all.length} phrase${all.length > 1 ? 's' : ''} found</div>
+        ${all.map((p, i) => `
+          <div class="card section" style="margin-bottom:16px;">
+            <div class="row" style="justify-content:space-between;align-items:flex-start;">
+              <div>
+                <h2 style="font-size:1.4rem;margin:0;">${esc(p.en)}</h2>
+                ${p.cn ? `<div style="margin-top:4px;color:var(--c2);font-weight:600;">${esc(p.cn)}</div>` : '<div class="muted" style="margin-top:4px;">No meaning available</div>'}
               </div>
-              ${p.cn ? `<div style="margin-top:6px;color:var(--text-soft);">${esc(p.cn)}</div>` : '<div class="muted" style="margin-top:4px;">No meaning available</div>'}
-            </div>`).join('')}
-        </div>`;
+              <button class="icon-btn" data-say="${esc(p.en)}" title="Read aloud">🔊</button>
+            </div>
+          </div>`).join('')}`;
       // wire pronunciation
       resultsDiv.querySelectorAll('[data-say]').forEach(b =>
         b.addEventListener('click', e => { e.stopPropagation(); window.Audio2.speakWord(b.dataset.say); }));
@@ -1165,12 +1165,12 @@
     view.innerHTML = `
       <h1 class="page-title">Vocabulary</h1>
       <p class="page-sub">All built-in words, your review words and phrases in one place.</p>
-      <div class="row section">
+      <div class="row section" style="margin-top:30px;">
         <input id="vSearch" class="input" placeholder="Search English or 中文..." style="flex:1;" autocomplete="off" />
         <button class="btn secondary" id="vExport">⬇ Export</button>
         <button class="btn ghost" id="vReset" title="Reset all local data">Reset</button>
       </div>
-      <div id="vResults" style="margin-top:22px;"></div>
+      <div id="vResults" style="margin-top:28px;"></div>
     `;
     const resultsDiv = $('#vResults');
     const searchInput = $('#vSearch');
