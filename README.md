@@ -1,4 +1,4 @@
-# 📘 IELTS Error Book
+# 📘 IELTS Vocab Trainer
 
 An offline-friendly **IELTS vocabulary trainer** built as a single static web app.
 Turn your frequently misspelled words into a personal error bank, drill them with
