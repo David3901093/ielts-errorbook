@@ -294,6 +294,10 @@
       input.focus();
       $('#sayBtn').addEventListener('click', () => window.Audio2.speakWord(w.en));
       $('#backBtn').addEventListener('click', () => showDictationPicker());
+      // auto-play the word pronunciation on question display
+      if (window.Audio2.autoplayEnabled()) {
+        setTimeout(() => window.Audio2.speakWord(w.en), 400);
+      }
       const check = () => {
         const ans = input.value.trim();
         if (!ans) return;
@@ -715,6 +719,10 @@
       // read-aloud buttons for each example sentence
       view.querySelectorAll('[data-say]').forEach(b =>
         b.addEventListener('click', () => { window.Audio2.speak(b.dataset.say); }));
+      // auto-play the word pronunciation on lookup
+      if (window.Audio2.autoplayEnabled()) {
+        setTimeout(() => window.Audio2.speakWord(word), 400);
+      }
       $('#exAdd').addEventListener('click', () => {
         const v = $('#exInput').value.trim();
         if (!v) return;
@@ -1191,6 +1199,16 @@
     };
     syncSound();
     sBtn.addEventListener('click', () => { window.Audio2.toggle(); syncSound(); });
+
+    // autoplay toggle (slide switch)
+    const apToggle = $('#autoplayToggle');
+    if (apToggle) {
+      apToggle.checked = window.Audio2.autoplayEnabled();
+      apToggle.addEventListener('change', () => {
+        window.Audio2.toggleAutoplay();
+        toast(apToggle.checked ? 'Auto-play on' : 'Auto-play off', apToggle.checked ? 'ok' : '');
+      });
+    }
 
     // route from hash
     const hash = location.hash.replace('#', '');
