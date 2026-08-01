@@ -14,6 +14,20 @@ const Audio2 = {
   _unlocked: false,
   _ttsAvailable: true,
   _audioCache: new Map(),
+  _currentAudio: null,   // the <audio> element currently playing (for strict single-stream)
+
+  /* Stop any audio that's currently playing. Prevents overlapping/mixing.
+     Stops both <audio> elements AND MeSpeak synthesis. */
+  _stopCurrent() {
+    if (this._currentAudio) {
+      try { this._currentAudio.pause(); this._currentAudio.src = ''; } catch (e) { /* ignore */ }
+      this._currentAudio = null;
+    }
+    // stop MeSpeak too (it plays via AudioContext, separate from <audio>)
+    if (window.TTS) window.TTS.stop();
+    // stop system speechSynthesis if active
+    try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+  },
 
   init() {
     const hasSS = ('speechSynthesis' in window);
@@ -90,6 +104,7 @@ const Audio2 = {
       Diag.log('audio', 'speak() skipped', { reason: !text ? 'empty' : 'disabled' });
       return false;
     }
+    this._stopCurrent(); // stop any audio already playing (prevents overlap/mixing)
     // detect whether the OS provides any TTS voices
     let voiceCount = 0;
     try { voiceCount = (speechSynthesis.getVoices() || []).length; } catch (e) { voiceCount = 0; }
@@ -217,6 +232,7 @@ const Audio2 = {
       Diag.log('audio', 'speakWord aborted', { reason: !word ? 'empty word' : 'sound disabled' });
       return;
     }
+    this._stopCurrent(); // stop any audio already playing (prevents overlap)
 
     // 1) howjsay CDN — direct mp3, lowercase, multi-word → %20
     const howjsay = 'https://d1qx7pbj0dvboc.cloudfront.net/' +
@@ -234,20 +250,30 @@ const Audio2 = {
     Diag.log('audio', 'ALL play methods failed', { word });
   },
 
-  /* Play a direct audio URL via <audio> element. Resolves true if it played. */
+  /* Play a direct audio URL via <audio>. STRICT single-stream: stops any audio
+     currently playing first, registers as _currentAudio, and only resolves on
+     actual 'ended'. On error/timeout it cleans up the element so it can't keep
+     playing and overlap the next word. Returns true only if it played fully. */
   _playUrl(url, word, source, timeoutMs) {
     return new Promise(resolve => {
       try {
+        this._stopCurrent(); // never overlap with a previous clip
         const a = new Audio(url);
+        this._currentAudio = a;
         let settled = false;
+        let timer = null;
         const done = (ok, info) => {
           if (settled) return; settled = true;
+          if (timer) clearTimeout(timer);
+          // on non-success, make sure this element is silenced & released
+          if (!ok) { try { a.pause(); a.src = ''; } catch (e) { /* ignore */ } }
+          if (this._currentAudio === a) this._currentAudio = null;
           Diag.log('audio', `<audio:${source}> outcome`, { word, ok, ...info });
           resolve(ok);
         };
         a.onended = () => done(true, { event: 'ended' });
         a.onerror = () => done(false, { event: 'error', code: a.error ? a.error.code : 'n/a' });
-        setTimeout(() => done(false, { event: 'timeout' }), timeoutMs || 5000);
+        timer = setTimeout(() => done(false, { event: 'timeout' }), timeoutMs || 5000);
         const p = a.play();
         if (p && typeof p.then === 'function') {
           p.then(() => Diag.log('audio', `<audio:${source}> play() resolved`, { word }))
