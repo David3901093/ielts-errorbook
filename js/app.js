@@ -468,7 +468,14 @@
       finishAdd(ok, wordEl, cnEl);
       return;
     }
-    // fuzzy suggest
+    // If user provided a Chinese meaning, they know the word — add directly
+    // without fuzzy suggestions (avoids blocking valid words like "add").
+    if (cn) {
+      const ok = window.Store.addError({ en: typed, cn: cn });
+      finishAdd(ok, wordEl, cnEl);
+      return;
+    }
+    // No Chinese provided → try fuzzy suggest (helps catch misspellings)
     const sugg = window.Fuzzy.suggestFromBank(typed);
     if (sugg) {
       const bankWord = getWordFromBank(sugg.word);
