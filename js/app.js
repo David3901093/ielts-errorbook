@@ -81,6 +81,7 @@
     bank: renderBank,
     cnen: renderCnEn,
     encyclopedia: renderEncyclopedia,
+    phrases: renderPhrases,
     cards: renderCards,
     stats: renderStats,
     vocab: renderVocab,
@@ -859,6 +860,82 @@
   }
 
   /* ============================================================
+     PHRASES — dedicated phrase search & study page.
+     Search box renders once; results update without losing focus.
+     ============================================================ */
+  function renderPhrases() {
+    view.innerHTML = `
+      <h1 class="page-title">Phrase Study</h1>
+      <p class="page-sub">Search phrases and collocations. Tap a phrase to see its meaning and example.</p>
+      <div class="row section">
+        <div class="autocomplete-wrap" style="flex:1;">
+          <input id="phSearch" class="input" placeholder="Type a word to find phrases (e.g. take, give, account)..." autocomplete="off" spellcheck="false" />
+        </div>
+        <button class="btn secondary" id="phSearchBtn">Search</button>
+      </div>
+      <div id="phResults"></div>
+    `;
+    const resultsDiv = $('#phResults');
+    const searchInput = $('#phSearch');
+
+    const doSearch = async (q) => {
+      const query = q.toLowerCase().trim();
+      if (!query) {
+        resultsDiv.innerHTML = `<div class="card"><div class="empty"><span class="ico">💬</span><div>Type a word above to find related phrases</div></div></div>`;
+        return;
+      }
+      resultsDiv.innerHTML = `<div class="card"><div class="muted">Searching phrases for "${esc(q)}"...</div></div>`;
+      // search: custom phrases + dictionary API phrases
+      const customPhrases = window.Store.getCustomPhrases().filter(p =>
+        p.en.toLowerCase().includes(query) || (p.cn || '').includes(q));
+      const apiPhrases = window.DictAPI.searchPhrases ? await window.DictAPI.searchPhrases(query) : [];
+      // merge + dedupe
+      const seen = new Set();
+      const all = [];
+      [...customPhrases, ...apiPhrases].forEach(p => {
+        const key = p.en.toLowerCase();
+        if (!seen.has(key)) { seen.add(key); all.push(p); }
+      });
+
+      if (!all.length) {
+        resultsDiv.innerHTML = `<div class="card"><div class="empty"><span class="ico">🔍</span><div>No phrases found for "${esc(q)}"</div><div class="muted">Try another word.</div></div></div>`;
+        return;
+      }
+      resultsDiv.innerHTML = `
+        <div class="muted" style="margin-bottom:12px;">${all.length} phrase${all.length > 1 ? 's' : ''} found</div>
+        <div class="card-grid">
+          ${all.map(p => `
+            <div class="card phrase-card" data-en="${esc(p.en)}">
+              <div class="row" style="justify-content:space-between;">
+                <h3 style="margin:0;font-size:1.05rem;">${esc(p.en)}</h3>
+                <button class="btn small ghost" data-say="${esc(p.en)}">🔊</button>
+              </div>
+              ${p.cn ? `<div style="margin-top:6px;color:var(--text-soft);">${esc(p.cn)}</div>` : '<div class="muted" style="margin-top:4px;">No meaning available</div>'}
+            </div>`).join('')}
+        </div>`;
+      // wire pronunciation
+      resultsDiv.querySelectorAll('[data-say]').forEach(b =>
+        b.addEventListener('click', e => { e.stopPropagation(); window.Audio2.speakWord(b.dataset.say); }));
+      // auto-play the first phrase
+      if (all[0]) autoSay(all[0].en);
+    };
+
+    // debounced search on input
+    let phTimer = null;
+    searchInput.addEventListener('input', e => {
+      clearTimeout(phTimer);
+      phTimer = setTimeout(() => doSearch(e.target.value), 300);
+    });
+    searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(searchInput.value); });
+    $('#phSearchBtn').addEventListener('click', () => doSearch(searchInput.value));
+    searchInput.focus();
+    // show custom phrases initially
+    const custom = window.Store.getCustomPhrases();
+    if (custom.length) doSearch(custom[0].en.split(' ')[0]);
+    else resultsDiv.innerHTML = `<div class="card"><div class="empty"><span class="ico">💬</span><div>Type a word above to find related phrases</div></div></div>`;
+  }
+
+  /* ============================================================
      CARDS — dynamically generated synonym / antonym / confusable pairs.
      No longer limited to a fixed 12; random sample each time, optionally
      enriched from the online dictionary API.
@@ -1071,9 +1148,25 @@
 
   /* ============================================================
      VOCABULARY (overview, search, export)
+     Search box is rendered ONCE; only results update (fixes input lag).
      ============================================================ */
   function renderVocab() {
-    const render = (q = '') => {
+    // render the shell (search box + buttons) once
+    view.innerHTML = `
+      <h1 class="page-title">Vocabulary</h1>
+      <p class="page-sub">All built-in words, your review words and phrases in one place.</p>
+      <div class="row section">
+        <input id="vSearch" class="input" placeholder="Search English or 中文..." style="flex:1;" autocomplete="off" />
+        <button class="btn secondary" id="vExport">⬇ Export</button>
+        <button class="btn ghost" id="vReset" title="Reset all local data">Reset</button>
+      </div>
+      <div id="vResults"></div>
+    `;
+    const resultsDiv = $('#vResults');
+    const searchInput = $('#vSearch');
+
+    // only re-render the results div, NOT the search box (prevents input lag)
+    const updateResults = (q) => {
       const ql = q.toLowerCase();
       const bank = window.IELTS.BANK.filter(w =>
         !ql || w.en.toLowerCase().includes(ql) || (w.cn || '').includes(q));
@@ -1081,16 +1174,9 @@
         !ql || w.en.toLowerCase().includes(ql) || (w.cn || '').includes(q));
       const phrs = window.Store.getPhrases().filter(p =>
         !ql || p.en.toLowerCase().includes(ql) || (p.cn || '').includes(q));
-      view.innerHTML = `
-        <h1 class="page-title">Vocabulary</h1>
-        <p class="page-sub">All built-in words, your review words and phrases in one place.</p>
-        <div class="row section">
-          <input id="vSearch" class="input" value="${esc(q)}" placeholder="Search English or 中文..." style="flex:1;" autocomplete="off" />
-          <button class="btn secondary" id="vExport">⬇ Export JSON</button>
-          <button class="btn ghost" id="vReset" title="Reset all local data">Reset</button>
-        </div>
+      resultsDiv.innerHTML = `
         <div class="grid grid-3 section">
-          <div class="card"><h3>IETLS Bank</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--c2)">${bank.length}</div></div>
+          <div class="card"><h3>Bank</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--c2)">${bank.length}</div></div>
           <div class="card"><h3>Review Words</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--bad)">${errs.length}</div></div>
           <div class="card"><h3>Phrases</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--ok)">${phrs.length}</div></div>
         </div>
@@ -1098,10 +1184,11 @@
           <div class="card">
             <h3>📚 Bank Words</h3>
             <div style="max-height:320px;overflow:auto;">
-              <ul class="word-list">${bank.map(w => `
+              <ul class="word-list">${bank.slice(0, 200).map(w => `
                 <li class="word-item"><span class="w">${esc(w.en)}</span><span class="m">${esc(w.cn||'')}</span>
                   <button class="btn small ghost" data-say="${esc(w.en)}">🔊</button></li>`).join('') || '<li class="muted">No match.</li>'}
               </ul>
+              ${bank.length > 200 ? `<div class="muted" style="padding:8px;text-align:center;">Showing first 200 of ${bank.length} matches. Narrow your search.</div>` : ''}
             </div>
           </div>
           <div class="card">
@@ -1115,27 +1202,35 @@
             </div>
           </div>
         </div>`;
-      view.querySelectorAll('[data-say]').forEach(b => b.addEventListener('click', () => window.Audio2.speakWord(b.dataset.say)));
-      $('#vSearch').addEventListener('input', e => render(e.target.value));
-      $('#vExport').addEventListener('click', () => {
-        const data = window.Store.exportAll();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'ielts-errorbook-backup.json'; a.click();
-        URL.revokeObjectURL(url);
-        toast('Exported backup ✓', 'ok');
-      });
-      $('#vReset').addEventListener('click', () => {
-        if (confirm('Reset ALL local data (review list, phrases, scores)? This cannot be undone.')) {
-          window.Store.resetAll();
-          window.Store.seedIfFirstRun();
-          toast('All data reset', '');
-          go('dashboard');
-        }
-      });
+      resultsDiv.querySelectorAll('[data-say]').forEach(b => b.addEventListener('click', () => window.Audio2.speakWord(b.dataset.say)));
     };
-    render('');
+
+    // debounced search — keeps focus in the input box
+    let vTimer = null;
+    searchInput.addEventListener('input', e => {
+      clearTimeout(vTimer);
+      vTimer = setTimeout(() => updateResults(e.target.value), 200);
+    });
+    $('#vExport').addEventListener('click', () => {
+      const data = window.Store.exportAll();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'vocab-backup.json'; a.click();
+      URL.revokeObjectURL(url);
+      toast('Exported backup ✓', 'ok');
+    });
+    $('#vReset').addEventListener('click', () => {
+      if (confirm('Reset ALL local data (review list, phrases, scores)? This cannot be undone.')) {
+        window.Store.resetAll();
+        window.Store.seedIfFirstRun();
+        toast('All data reset', '');
+        go('dashboard');
+      }
+    });
+    // initial render
+    updateResults('');
+    searchInput.focus();
   }
 
   /* ============================================================
