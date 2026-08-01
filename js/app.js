@@ -328,8 +328,11 @@
           // auto-advance after 1.2s
           setTimeout(() => { if (idx + 1 < queue.length) next(); else finishSession(); }, 1200);
         } else {
-          // wrong: add word to error bank automatically (phrases excluded), show answer
-          if (w.type !== 'phrase') {
+          // wrong: immediately add to personal list — words go to Review List,
+          // phrases go to My Phrases. Both are saved instantly.
+          if (w.type === 'phrase') {
+            window.Store.addPhrase({ en: w.en, cn: w.cn });
+          } else {
             window.Store.addErrorIfNew({ en: w.en, cn: w.cn, source: 'dictation' });
             window.Store.setErrorField(w.en, { wrongCount: (w.wrongCount || 0) + 1 });
           }
@@ -597,6 +600,8 @@
         fb.innerHTML = `✓ 正确！`;
         window.Store.bump('cnEnDone');
       } else {
+        // wrong: ensure the phrase is saved to personal phrase bank
+        window.Store.addPhrase({ en: p.en, cn: p.cn });
         fb.className = 'feedback bad';
         fb.innerHTML = `✗ 正确答案：<button class="say-inline" data-say="${esc(p.en)}" title="Read aloud">🔊</button><b>${esc(p.en)}</b>`;
         const sb = fb.querySelector('[data-say]');
