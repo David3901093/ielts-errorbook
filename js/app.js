@@ -104,7 +104,7 @@
     if (todayDay.failed) {
       banner = `<div class="banner fail">⚠️ Today's score is below 0 — today is marked <b>Unqualified</b>. Keep practising to rebuild your score!</div>`;
     } else if (reviewable.length && !todayDay.reviewDone) {
-      banner = `<div class="banner review">📌 You have <b>${reviewable.length}</b> error-word${reviewable.length > 1 ? 's' : ''} to review today. <button class="btn small" id="goReview">Start Review</button></div>`;
+      banner = `<div class="banner review">📌 You have <b>${reviewable.length}</b> word${reviewable.length > 1 ? 's' : ''} to review today. <button class="btn small" id="goReview">Start Review</button></div>`;
     } else if (todayDay.reviewDone) {
       banner = `<div class="banner ok">✅ Daily review complete! Great work. Come back tomorrow.</div>`;
     }
@@ -145,7 +145,7 @@
         <div class="card stat"><div class="num">${p.totalScore}</div><div class="lbl">TOTAL SCORE</div></div>
         <div class="card stat"><div class="num">${todayDay.score ?? 0}</div><div class="lbl">TODAY'S SCORE</div></div>
         <div class="card stat"><div class="num">${p.streak || 0} 🔥</div><div class="lbl">DAY STREAK</div></div>
-        <div class="card stat"><div class="num">${errors.length}</div><div class="lbl">ERROR WORDS</div></div>
+        <div class="card stat"><div class="num">${errors.length}</div><div class="lbl">REVIEW WORDS</div></div>
       </div>
 
       <div class="grid grid-2 section">
@@ -166,7 +166,7 @@
             <button class="btn secondary" data-go="cnen">CN → EN</button>
             <button class="btn secondary" data-go="cards">Flip Cards</button>
           </div>
-          <div class="muted" style="margin-top:14px;">Daily review re-tests your error words so they stick in long-term memory.</div>
+          <div class="muted" style="margin-top:14px;">Daily review re-tests your review words so they stick in long-term memory.</div>
         </div>
       </div>
 
@@ -203,7 +203,7 @@
     const TS = window.IELTS.TAG_STATS || {};
     const lists = [
       { key: 'mix',     label: '🔀 Mixed Review',      count: mixCount,         desc: 'Error words + your phrases, shuffled together' },
-      { key: 'errors',  label: '📕 Error Bank',        count: errors.length,    desc: 'Your personal misspelled words (auto-collected)' },
+      { key: 'errors',  label: '📕 Review List',        count: errors.length,    desc: 'Words you missed in dictation (auto-collected)' },
       { key: 'ielts',   label: '📘 IELTS 雅思',         count: TS.ielts || 0,    desc: 'IELTS core vocabulary' },
       { key: 'toefl',   label: '📗 TOEFL 托福',         count: TS.toefl || 0,    desc: 'TOEFL vocabulary' },
       { key: 'cet4',    label: '📙 CET-4 四级',         count: TS.cet4  || 0,    desc: 'College English Test Band 4' },
@@ -246,7 +246,7 @@
       label = 'Mixed Review';
     } else if (listKey === 'errors') {
       pool = errors2.map(e => ({ en: e.en, cn: e.cn, type: 'word' }));
-      label = 'Error Bank';
+      label = 'Review List';
     } else {
       pool = window.IELTS.BANK.filter(w => (w.tags || '').split(/\s+/).includes(listKey) && w.cn)
         .map(w => ({ en: w.en, cn: w.cn, type: 'word' }));
@@ -351,7 +351,7 @@
       $('#dots').innerHTML = dots.map(d => `<span class="dot ${d}"></span>`).join('');
     };
     const finishSession = () => {
-      if (label === 'Error Bank') window.Store.setDayField('reviewDone', true);
+      if (label === 'Review List') window.Store.setDayField('reviewDone', true);
       const d = window.Store.getDay();
       view.innerHTML = `
         <h1 class="page-title">Session Complete 🎉</h1>
@@ -395,10 +395,10 @@
             <button class="btn small ghost" data-master="${esc(w.en)}">${w.mastered ? '↺' : '✓'}</button>
             <button class="icon-x" data-del="${esc(w.en)}" title="remove">✕</button>
           </li>`).join('')}</ul>`
-      : emptyHTML('No error words', 'Add a word you often misspell below.');
+      : emptyHTML('No review words yet', 'Add a word you often misspell below.');
 
     view.innerHTML = `
-      <h1 class="page-title">Error Bank</h1>
+      <h1 class="page-title">Review List</h1>
       <p class="page-sub">Type a word you got wrong. We'll suggest the correct spelling for you to confirm.</p>
 
       <div class="card section">
@@ -412,7 +412,7 @@
       </div>
 
       <div class="card section">
-        <h3>📚 My Error Words (${errors.length})</h3>
+        <h3>📚 My Review Words (${errors.length})</h3>
         ${list}
       </div>
     `;
@@ -479,11 +479,11 @@
   function finishAdd(ok, wordEl, cnEl) {
     if (ok) {
       window.Store.bump('wordsAdded');
-      toast('Added to error bank ✓', 'ok');
+      toast('Added to review list ✓', 'ok');
       wordEl.value = ''; cnEl.value = ''; wordEl.focus();
       renderBankList();
     } else {
-      toast('Already in your error bank', 'bad');
+      toast('Already in your review list', 'bad');
     }
   }
 
@@ -1065,7 +1065,7 @@
         !ql || p.en.toLowerCase().includes(ql) || (p.cn || '').includes(q));
       view.innerHTML = `
         <h1 class="page-title">Vocabulary</h1>
-        <p class="page-sub">All built-in words, your error words and phrases in one place.</p>
+        <p class="page-sub">All built-in words, your review words and phrases in one place.</p>
         <div class="row section">
           <input id="vSearch" class="input" value="${esc(q)}" placeholder="Search English or 中文..." style="flex:1;" autocomplete="off" />
           <button class="btn secondary" id="vExport">⬇ Export JSON</button>
@@ -1073,7 +1073,7 @@
         </div>
         <div class="grid grid-3 section">
           <div class="card"><h3>IETLS Bank</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--c2)">${bank.length}</div></div>
-          <div class="card"><h3>Error Words</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--bad)">${errs.length}</div></div>
+          <div class="card"><h3>Review Words</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--bad)">${errs.length}</div></div>
           <div class="card"><h3>Phrases</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--ok)">${phrs.length}</div></div>
         </div>
         <div class="grid grid-2 section">
@@ -1087,7 +1087,7 @@
             </div>
           </div>
           <div class="card">
-            <h3>📕 Error Bank</h3>
+            <h3>📕 Review List</h3>
             <div style="max-height:160px;overflow:auto;">
               <ul class="word-list">${errs.map(w => `<li class="word-item"><span class="w">${esc(w.en)}</span><span class="m">${esc(w.cn||'')}</span></li>`).join('') || '<li class="muted">Empty.</li>'}</ul>
             </div>
@@ -1109,7 +1109,7 @@
         toast('Exported backup ✓', 'ok');
       });
       $('#vReset').addEventListener('click', () => {
-        if (confirm('Reset ALL local data (error bank, phrases, scores)? This cannot be undone.')) {
+        if (confirm('Reset ALL local data (review list, phrases, scores)? This cannot be undone.')) {
           window.Store.resetAll();
           window.Store.seedIfFirstRun();
           toast('All data reset', '');
