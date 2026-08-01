@@ -990,7 +990,8 @@
     const phBank = window.__PHRASES || [];
     if (phBank.length) {
       const random = pick(phBank);
-      doSearch(random.en.split(/[\s-]+/)[0]);
+      searchInput.value = random.en;
+      doSearch(random.en);
     } else {
       resultsDiv.innerHTML = `<div class="card"><div class="empty"><span class="ico">💬</span><div>Type a word above to find related phrases</div></div></div>`;
     }
