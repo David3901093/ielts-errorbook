@@ -956,7 +956,7 @@
       }
       resultsDiv.innerHTML = `
         <div style="margin-bottom:14px;color:#fff;font-weight:600;">${all.length} phrase${all.length > 1 ? 's' : ''} found</div>
-        ${all.map((p, i) => `
+        ${all.map(p => `
           <div class="card section" style="margin-bottom:16px;">
             <div class="row" style="justify-content:space-between;align-items:flex-start;">
               <div>
@@ -965,6 +965,16 @@
               </div>
               <button class="icon-btn" data-say="${esc(p.en)}" title="Read aloud">🔊</button>
             </div>
+            ${p.examples && p.examples.length ? `
+              <h4 style="margin-top:12px;font-size:.85rem;color:var(--text-mute);">Example Sentences</h4>
+              <ul style="margin:6px 0 0 18px;line-height:1.7;">
+                ${p.examples.slice(0, 3).map(ex => `
+                  <li style="margin-bottom:6px;">
+                    <button class="say-inline" data-say="${esc(ex.en)}" title="Read aloud">🔊</button>
+                    <span>${esc(ex.en)}</span>
+                    ${ex.cn ? `<div style="color:var(--text-soft);font-size:.85rem;margin-left:30px;">${esc(ex.cn)}</div>` : ''}
+                  </li>`).join('')}
+              </ul>` : ''}
           </div>`).join('')}`;
       // wire pronunciation
       resultsDiv.querySelectorAll('[data-say]').forEach(b =>
