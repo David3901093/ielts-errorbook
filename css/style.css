@@ -361,11 +361,12 @@ canvas { width: 100%; height: auto; display: block; }
 
 /* ============ VOCABULARY BANK BANNER (dashboard) ============ */
 .vocab-banner { background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(219,234,254,.85)); }
-.vocab-banner-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.vocab-banner-top h3 { margin: 0; }
-.vocab-total { color: var(--text-soft); font-size: .9rem; }
+.vocab-banner-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.vocab-banner-top h3 { margin: 0; white-space: nowrap; }
+.vocab-total { color: var(--text-soft); font-size: .9rem; white-space: nowrap; }
 .vocab-total b { color: var(--c2); font-size: 1.15rem; }
-.vocab-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.vocab-chips { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.vocab-chips::-webkit-scrollbar { display: none; }
 .vocab-chip {
   display: inline-flex; align-items: center; gap: 5px;
   background: var(--grad-soft); border: 1px solid rgba(37,99,235,.18);
