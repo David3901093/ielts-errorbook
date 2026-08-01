@@ -948,7 +948,7 @@
         return;
       }
       resultsDiv.innerHTML = `
-        <div class="muted" style="margin-bottom:14px;">${all.length} phrase${all.length > 1 ? 's' : ''} found</div>
+        <div style="margin-bottom:14px;color:#fff;font-weight:600;">${all.length} phrase${all.length > 1 ? 's' : ''} found</div>
         ${all.map((p, i) => `
           <div class="card section" style="margin-bottom:16px;">
             <div class="row" style="justify-content:space-between;align-items:flex-start;">
