@@ -42,6 +42,13 @@ const Audio2 = {
       }
     } catch (e) { Diag.log('audio', 'onvoiceschanged setup error', String(e)); }
     this._setupUnlock();
+    // if no system voices (e.g. HarmonyOS), warm up MeSpeak in the background
+    // so it's ready when the user first taps a sentence.
+    let vc = 0; try { vc = (speechSynthesis.getVoices() || []).length; } catch (e) {}
+    if (vc === 0 && window.TTS) {
+      Diag.log('audio', 'no system voices — preloading MeSpeak in background');
+      window.TTS.ensureLoaded();
+    }
   },
 
   /* Prime audio context on first user gesture (mobile autoplay policy). */
@@ -74,29 +81,55 @@ const Audio2 = {
     return s.sound;
   },
 
-  /* Speak arbitrary text (a sentence). Priority:
-     1. MeSpeak (pure in-browser synthesis — fluent, no OS voices needed) ← key for HarmonyOS
-     2. online sentence TTS (StreamElements → Google) — where not blocked
-     3. word-by-word audio (howjsay → Youdao) — last-resort fallback
-     4. system speechSynthesis (works only where voices exist) */
+  /* Speak arbitrary text (a sentence). Smart routing:
+     - If the OS has TTS voices → use system speechSynthesis (fast, natural)
+     - If no voices (HarmonyOS) → MeSpeak in-browser synthesis (fluent, robotic)
+     - Then online TTS, then word-by-word as further fallbacks */
   async speak(text) {
     if (!text || !this.enabled()) {
       Diag.log('audio', 'speak() skipped', { reason: !text ? 'empty' : 'disabled' });
       return false;
     }
-    // 1) MeSpeak pure in-browser TTS (fluent sentences, no system voices)
-    if (window.TTS) {
-      const ok = await window.TTS.speak(text);
+    // detect whether the OS provides any TTS voices
+    let voiceCount = 0;
+    try { voiceCount = (speechSynthesis.getVoices() || []).length; } catch (e) { voiceCount = 0; }
+    Diag.log('audio', 'speak() routing', { text: text.slice(0, 30), systemVoices: voiceCount });
+
+    // 1) system speechSynthesis when voices exist (Windows/Mac/Android — fast & natural)
+    if (voiceCount > 0 && this._systemTts(text)) return true;
+
+    // 2) MeSpeak in-browser TTS (HarmonyOS — no system voices, fluent synthesis)
+    if (voiceCount === 0 && window.TTS) {
+      const ok = await this._ttsWithTimeout(text, 6000);
       if (ok) return true;
     }
-    // 2) whole-sentence online TTS (StreamElements → Google)
+    // 3) whole-sentence online TTS (StreamElements → Google)
     if (await this._playSentence(text)) return true;
-    // 3) word-by-word audio (howjsay → Youdao)
-    Diag.log('audio', 'all fluent TTS failed, trying word-by-word audio', { text: text.slice(0, 40) });
+    // 4) word-by-word audio (howjsay → Youdao)
+    Diag.log('audio', 'fluent TTS unavailable, trying word-by-word audio', { text: text.slice(0, 40) });
     if (await this._playWordByWord(text)) return true;
-    // 4) system speechSynthesis (last resort)
-    Diag.log('audio', 'word-by-word failed, trying system speechSynthesis', { text: text.slice(0, 40) });
+    // 5) system speechSynthesis last resort (in case voiceCount detection was wrong)
+    Diag.log('audio', 'all methods failed, trying system speechSynthesis', { text: text.slice(0, 40) });
     return this._systemTts(text);
+  },
+
+  /* Call MeSpeak.speak() but give up after timeoutMs (config/voice load can hang
+     on slow networks like HarmonyOS mobile). Returns true if it spoke. */
+  async _ttsWithTimeout(text, timeoutMs) {
+    try {
+      const result = await Promise.race([
+        window.TTS.speak(text),
+        new Promise(resolve => setTimeout(() => resolve('__timeout__'), timeoutMs))
+      ]);
+      if (result === '__timeout__') {
+        Diag.log('audio', 'MeSpeak timed out (config/voice load too slow)', { ms: timeoutMs });
+        return false;
+      }
+      return !!result;
+    } catch (e) {
+      Diag.log('audio', 'MeSpeak error', String(e));
+      return false;
+    }
   },
 
   /* Last-resort sentence reader for HarmonyOS: split the sentence into words
