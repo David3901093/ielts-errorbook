@@ -1,23 +1,17 @@
 /* ============================================================
-   tts.js — Pure client-side sentence TTS via MeSpeak.js (eSpeak).
-   This synthesizes FLUENT whole-sentence speech entirely in the browser,
-   using the Web Audio API (AudioContext). It does NOT depend on the OS
-   speechSynthesis voices — so it works on HarmonyOS where the system
-   TTS engine is empty (voiceCount:0, synthesis-failed).
-
-   MeSpeak.js is loaded from a CDN; config + voice are fetched once and
-   cached. Playback requires a user gesture on mobile (AudioContext).
+   tts.js - Pure client-side sentence TTS via MeSpeak.js (eSpeak).
+   Synthesizes fluent whole-sentence speech in the browser using Web Audio
+   API. Does NOT depend on OS speechSynthesis voices - works on HarmonyOS.
+   Logs to console only (no external logging dependency).
    ============================================================ */
 
 const MS_BASE = 'https://cdn.jsdelivr.net/npm/mespeak@1.9.6';
 
 const TTS = {
-  _state: 'idle',     // idle | loading | ready | error
+  _state: 'idle',
   _ready: false,
   _loadPromise: null,
 
-  /* Load the MeSpeak engine + config + English voice. Idempotent.
-     Returns a promise that resolves to true/false. */
   ensureLoaded() {
     if (this._loadPromise) return this._loadPromise;
     this._loadPromise = this._load();
@@ -26,23 +20,21 @@ const TTS = {
 
   _load() {
     return new Promise(resolve => {
-      Diag.log('tts', 'loading MeSpeak engine');
+      console.log('[tts] loading MeSpeak engine');
       this._state = 'loading';
-      // load the engine script
       const s = document.createElement('script');
       s.src = MS_BASE + '/mespeak.full.min.js';
       s.onload = () => {
         if (typeof meSpeak === 'undefined') {
-          Diag.log('tts', 'MeSpeak script loaded but meSpeak undefined');
+          console.warn('[tts] meSpeak undefined after load');
           this._state = 'error';
           return resolve(false);
         }
-        Diag.log('tts', 'MeSpeak engine script loaded, loading config (557KB)');
-        // wrap config load in a timeout — the 557KB JSON can hang on slow mobile networks
+        console.log('[tts] engine loaded, loading config');
         let cfgDone = false;
         const cfgTimer = setTimeout(() => {
           if (!cfgDone) {
-            Diag.log('tts', 'MeSpeak config load TIMED OUT (8s) — CDN too slow/blocked');
+            console.warn('[tts] config load timed out');
             this._state = 'error';
             resolve(false);
           }
@@ -51,67 +43,37 @@ const TTS = {
           if (cfgDone) return;
           cfgDone = true;
           clearTimeout(cfgTimer);
-          if (!ok) {
-            Diag.log('tts', 'MeSpeak config failed', String(msg));
-            this._state = 'error';
-            return resolve(false);
-          }
-          Diag.log('tts', 'MeSpeak config loaded, loading voice en-us');
+          if (!ok) { console.warn('[tts] config failed', msg); this._state = 'error'; return resolve(false); }
+          console.log('[tts] config loaded, loading voice');
           meSpeak.loadVoice(MS_BASE + '/voices/en/en-us.json', (vok, vmsg) => {
-            if (!vok) {
-              Diag.log('tts', 'MeSpeak voice failed', String(vmsg));
-              this._state = 'error';
-              return resolve(false);
-            }
-            Diag.log('tts', 'MeSpeak ready (en-us voice loaded)');
+            if (!vok) { console.warn('[tts] voice failed', vmsg); this._state = 'error'; return resolve(false); }
+            console.log('[tts] ready');
             this._state = 'ready';
             this._ready = true;
             resolve(true);
           });
         });
       };
-      s.onerror = (e) => {
-        Diag.log('tts', 'MeSpeak script failed to load (CDN blocked?)');
-        this._state = 'error';
-        resolve(false);
-      };
+      s.onerror = () => { console.warn('[tts] script load failed'); this._state = 'error'; resolve(false); };
       document.head.appendChild(s);
     });
   },
 
   isReady() { return this._ready; },
 
-  /* Stop any MeSpeak playback currently in progress. */
   stop() {
-    try {
-      if (this._ready && typeof meSpeak !== 'undefined' && meSpeak.stop) {
-        meSpeak.stop();
-      }
-    } catch (e) { /* ignore */ }
+    try { if (this._ready && typeof meSpeak !== 'undefined' && meSpeak.stop) meSpeak.stop(); } catch (e) { /* ignore */ }
   },
 
-  /* Synthesize and play a sentence. Returns true if playback started.
-     MUST be called from a user gesture on mobile (AudioContext policy). */
   async speak(text) {
     if (!text) return false;
     const ok = await this.ensureLoaded();
-    if (!ok) {
-      Diag.log('tts', 'speak() aborted — MeSpeak not ready');
-      return false;
-    }
+    if (!ok) return false;
     try {
-      Diag.log('tts', 'MeSpeak.speak()', { text: text.slice(0, 50) });
-      // meSpeak.speak returns the generated audio object (plays via AudioContext)
-      const result = meSpeak.speak(text, {
-        amplitude: 100,
-        pitch: 50,
-        speed: 175,
-        wordgap: 0
-      });
-      Diag.log('tts', 'MeSpeak.speak() returned', { hasResult: !!result });
+      const result = meSpeak.speak(text, { amplitude: 100, pitch: 50, speed: 175, wordgap: 0 });
       return !!result;
     } catch (e) {
-      Diag.log('tts', 'MeSpeak.speak() threw', String(e));
+      console.warn('[tts] speak error', e);
       return false;
     }
   }
