@@ -453,8 +453,6 @@
     $('#bkAdd').addEventListener('click', handleAdd);
     $('#bkWord').addEventListener('keydown', e => { if (e.key === 'Enter') $('#bkCn').focus(); });
     $('#bkCn').addEventListener('keydown', e => { if (e.key === 'Enter') handleAdd(); });
-    // auto-play the first review word
-    if (errors[0]) autoSay(errors[0].en);
   }
 
   function handleAdd() {
@@ -747,8 +745,6 @@
       // read-aloud buttons for each example sentence
       view.querySelectorAll('[data-say]').forEach(b =>
         b.addEventListener('click', () => { window.Audio2.speak(b.dataset.say); }));
-      // auto-play the word pronunciation on lookup
-      autoSay(word, 400);
       $('#exAdd').addEventListener('click', () => {
         const v = $('#exInput').value.trim();
         if (!v) return;
