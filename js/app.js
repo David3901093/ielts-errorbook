@@ -28,10 +28,10 @@
   /* Toast shown when sentence TTS is unavailable (e.g. HarmonyOS has no TTS engine). */
   window._showAudioToast = function () {
     const t = $('#toast');
-    t.innerHTML = '🔇 This browser does not support sentence audio. <br>Sentence TTS requires a system voice engine, which is unavailable here. Word pronunciation still works.';
-    t.className = 'toast show bad';
+    t.innerHTML = '<span class="toast-ico">🔇</span><span>Sentence audio is not supported on this browser. Word pronunciation still works.</span>';
+    t.className = 'toast show notice';
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => (t.className = 'toast'), 5000);
+    toast._t = setTimeout(() => (t.className = 'toast'), 4500);
   };
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function shuffle(arr) {
