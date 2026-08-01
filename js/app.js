@@ -461,28 +461,40 @@
     const cn = cnEl.value.trim();
     if (!typed) { toast('Type a word first', 'bad'); return; }
 
-    // exact match to a correct spelling in bank → use bank's Chinese, add directly
+    // exact match to a correct spelling in bank?
     const exact = window.IELTS.BANK.find(w => w.en.toLowerCase() === typed.toLowerCase());
     if (exact) {
       const ok = window.Store.addError({ en: exact.en, cn: cn || exact.cn });
       finishAdd(ok, wordEl, cnEl);
       return;
     }
-    // Not in bank. If user provided Chinese → add directly (they know the word).
-    // If no Chinese → try to auto-match from bank via fuzzy; if found, use that
-    // word's Chinese and add directly (no blocking suggestion popup).
-    if (!cn) {
-      const sugg = window.Fuzzy.suggestFromBank(typed);
-      if (sugg) {
-        const bankWord = getWordFromBank(sugg.word);
-        const autoCn = bankWord ? bankWord.cn : '';
-        const ok = window.Store.addError({ en: sugg.word, cn: autoCn, misspelled: typed });
-        if (ok) toast(`Added "${sugg.word}" (matched from "${typed}")`, 'ok');
+    // fuzzy suggest
+    const sugg = window.Fuzzy.suggestFromBank(typed);
+    if (sugg) {
+      const bankWord = getWordFromBank(sugg.word);
+      const cnForSugg = cn || (bankWord ? bankWord.cn : '');
+      const html = `
+        <div class="banner review" style="margin:0;">
+          <div>Did you mean <b>${esc(sugg.word)}</b>? (${esc(bankWord ? bankWord.cn : '')})
+          <span class="muted" style="font-size:.8rem;">You typed "${esc(typed)}"</span></div>
+          <div class="row">
+            <button class="btn small" id="useSugg">Use "${esc(sugg.word)}"</button>
+            <button class="btn small secondary" id="keepMine">Keep "${esc(typed)}"</button>
+          </div>
+        </div>`;
+      const area = $('#suggestArea');
+      area.innerHTML = html;
+      $('#useSugg').addEventListener('click', () => {
+        const ok = window.Store.addError({ en: sugg.word, cn: cnForSugg, misspelled: typed });
         finishAdd(ok, wordEl, cnEl);
-        return;
-      }
+      });
+      $('#keepMine').addEventListener('click', () => {
+        const ok = window.Store.addError({ en: typed, cn: cn, misspelled: null });
+        finishAdd(ok, wordEl, cnEl);
+      });
+      return;
     }
-    // No match at all → add exactly what the user typed
+    // no close match → keep as typed
     const ok = window.Store.addError({ en: typed, cn: cn });
     finishAdd(ok, wordEl, cnEl);
   }
