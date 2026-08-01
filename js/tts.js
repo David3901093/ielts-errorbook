@@ -37,8 +37,20 @@ const TTS = {
           this._state = 'error';
           return resolve(false);
         }
-        Diag.log('tts', 'MeSpeak engine script loaded, loading config');
+        Diag.log('tts', 'MeSpeak engine script loaded, loading config (557KB)');
+        // wrap config load in a timeout — the 557KB JSON can hang on slow mobile networks
+        let cfgDone = false;
+        const cfgTimer = setTimeout(() => {
+          if (!cfgDone) {
+            Diag.log('tts', 'MeSpeak config load TIMED OUT (8s) — CDN too slow/blocked');
+            this._state = 'error';
+            resolve(false);
+          }
+        }, 8000);
         meSpeak.loadConfig(MS_BASE + '/mespeak_config.json', (ok, msg) => {
+          if (cfgDone) return;
+          cfgDone = true;
+          clearTimeout(cfgTimer);
           if (!ok) {
             Diag.log('tts', 'MeSpeak config failed', String(msg));
             this._state = 'error';
