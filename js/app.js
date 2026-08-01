@@ -45,6 +45,17 @@
   function getWordFromBank(en) {
     return window.IELTS.BANK.find(w => w.en.toLowerCase() === (en || '').toLowerCase());
   }
+  /* Auto-play a word/phrase if autoplay is enabled. Delayed slightly so
+     the page renders first. Safe to call on any page. */
+  function autoSay(text, delay = 500) {
+    if (!text || !window.Audio2.autoplayEnabled()) return;
+    setTimeout(() => {
+      if (currentRoute !== 'dashboard' || delay === 500) {
+        // only play if we're still on a relevant page
+        window.Audio2.speakWord(text);
+      }
+    }, delay);
+  }
 
   /* ----------------------------- score header ----------------------------- */
   function refreshScore() {
@@ -186,6 +197,8 @@
     const picks = shuffle(pool).slice(0, 3);
     const wrap = $('#homeCards');
     picks.forEach(w => wrap.appendChild(buildFlipCard(w)));
+    // auto-play the first recommended card's word
+    if (picks[0]) autoSay(picks[0].en);
   }
 
   /* ============================================================
@@ -295,9 +308,7 @@
       $('#sayBtn').addEventListener('click', () => window.Audio2.speakWord(w.en));
       $('#backBtn').addEventListener('click', () => showDictationPicker());
       // auto-play the word pronunciation on question display
-      if (window.Audio2.autoplayEnabled()) {
-        setTimeout(() => window.Audio2.speakWord(w.en), 400);
-      }
+      autoSay(w.en, 400);
       const check = () => {
         const ans = input.value.trim();
         if (!ans) return;
@@ -431,6 +442,8 @@
     $('#bkAdd').addEventListener('click', handleAdd);
     $('#bkWord').addEventListener('keydown', e => { if (e.key === 'Enter') $('#bkCn').focus(); });
     $('#bkCn').addEventListener('keydown', e => { if (e.key === 'Enter') handleAdd(); });
+    // auto-play the first review word
+    if (errors[0]) autoSay(errors[0].en);
   }
 
   function handleAdd() {
@@ -566,6 +579,8 @@
       $('#phFb').textContent = ''; $('#phFb').className = 'feedback';
       $('#phCheck').disabled = false; $('#phNext').disabled = true;
       $('#phSay').onclick = () => window.Audio2.speakWord(p.en);
+      // auto-play the phrase pronunciation
+      autoSay(p.en, 400);
     };
     const check = () => {
       const p = round[i];
@@ -720,9 +735,7 @@
       view.querySelectorAll('[data-say]').forEach(b =>
         b.addEventListener('click', () => { window.Audio2.speak(b.dataset.say); }));
       // auto-play the word pronunciation on lookup
-      if (window.Audio2.autoplayEnabled()) {
-        setTimeout(() => window.Audio2.speakWord(word), 400);
-      }
+      autoSay(word, 400);
       $('#exAdd').addEventListener('click', () => {
         const v = $('#exInput').value.trim();
         if (!v) return;
