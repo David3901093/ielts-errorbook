@@ -74,41 +74,43 @@ const DictAPI = {
   },
 
   /* Search for phrases/collocations containing a word.
-     Uses the dictionary API's example sentences (which often contain the
-     word in context) + extracts multi-word expressions. Cached in Store. */
+     Uses the pre-built local phrase bank (window.__PHRASES, ~18000 entries
+     from ECDICT with Chinese translations). Falls back to API only if the
+     local bank is empty. Results are cached. */
   async searchPhrases(word) {
     const key = (word || '').toLowerCase().trim();
     if (!key) return [];
-    // check cache first
     const cached = window.Store.getPhraseCache(key);
     if (cached && cached.phrases) return cached.phrases;
 
-    const phrases = [];
-    try {
-      const data = await DictAPI.fetch(key);
-      if (data && data.examples && data.examples.length) {
-        // extract 2-3 word phrases containing the target word from examples
-        data.examples.forEach(ex => {
-          const words = ex.toLowerCase().match(/[a-z]+/g) || [];
-          for (let i = 0; i < words.length - 1; i++) {
-            if (words[i] === key || words[i + 1] === key) {
-              const phrase = words.slice(i, i + 3).join(' ');
-              if (phrase.split(' ').length >= 2 && !phrases.some(p => p.en === phrase)) {
-                phrases.push({ en: phrase, cn: '' });
+    let phrases = [];
+    // 1) local pre-built phrase bank (primary — has Chinese translations)
+    const localBank = window.__PHRASES || [];
+    if (localBank.length) {
+      phrases = localBank
+        .filter(p => p.en.toLowerCase().includes(key))
+        .slice(0, 12);
+    }
+    // 2) if local bank has no matches, try dictionary API as fallback
+    if (!phrases.length) {
+      try {
+        const data = await DictAPI.fetch(key);
+        if (data && data.examples && data.examples.length) {
+          data.examples.forEach(ex => {
+            const words = ex.toLowerCase().match(/[a-z]+/g) || [];
+            for (let i = 0; i < words.length - 1; i++) {
+              if (words[i] === key || words[i + 1] === key) {
+                const phrase = words.slice(i, i + 3).join(' ');
+                if (phrase.split(' ').length >= 2 && !phrases.some(p => p.en === phrase)) {
+                  phrases.push({ en: phrase, cn: '' });
+                }
               }
             }
-          }
-        });
-      }
-    } catch (e) { /* silent */ }
-    // also match built-in confusable pairs that contain the word
-    (window.IELTS.PAIRS || []).forEach(p => {
-      if (p.a.toLowerCase() === key || p.b.toLowerCase() === key) {
-        const other = p.a.toLowerCase() === key ? p.b : p.a;
-        if (!phrases.some(ph => ph.en === other)) phrases.push({ en: other, cn: p.note || '' });
-      }
-    });
-    const result = phrases.slice(0, 8);
+          });
+        }
+      } catch (e) { /* silent */ }
+    }
+    const result = phrases.slice(0, 12);
     window.Store.setPhraseCache(key, result);
     return result;
   }
