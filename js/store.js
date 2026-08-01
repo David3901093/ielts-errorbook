@@ -234,27 +234,14 @@ const Store = {
   },
 
   /* ---------- Settings ---------- */
-  getSettings() { return read(KEY.settings, { sound: true, seeded: false }); },
+  getSettings() { return read(KEY.settings, { sound: true, seeded: false, autoplay: true }); },
   saveSettings(s) { write(KEY.settings, s); },
 
-  /* ---------- Seed error bank (idempotent merge) ----------
-     Always ensures every built-in red-word seed exists, without
-     duplicating or overwriting student-added data. New seeds added in
-     later versions are back-filled for existing users too. */
+  /* ---------- Error bank starts EMPTY (default 0 words) ----------
+     No built-in seeding. The error bank is populated purely by dictation
+     mistakes (addErrorIfNew) — a true personal error bank that grows
+     from the student's own mistakes. */
   seedIfFirstRun() {
-    const existing = Store.getErrors();
-    let added = false;
-    window.IELTS.SEED_ERRORS.forEach(e => {
-      if (!existing.some(w => w.en.toLowerCase() === e.en.toLowerCase())) {
-        existing.push({
-          en: e.en, cn: e.cn, misspelled: e.misspelled,
-          correctCount: 0, wrongCount: 0, mastered: false,
-          added: todayKey(), seeded: true
-        });
-        added = true;
-      }
-    });
-    if (added) Store.saveErrors(existing);
     const s = Store.getSettings();
     if (!s.seeded) { s.seeded = true; Store.saveSettings(s); }
   },
