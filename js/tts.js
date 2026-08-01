@@ -81,6 +81,15 @@ const TTS = {
 
   isReady() { return this._ready; },
 
+  /* Stop any MeSpeak playback currently in progress. */
+  stop() {
+    try {
+      if (this._ready && typeof meSpeak !== 'undefined' && meSpeak.stop) {
+        meSpeak.stop();
+      }
+    } catch (e) { /* ignore */ }
+  },
+
   /* Synthesize and play a sentence. Returns true if playback started.
      MUST be called from a user gesture on mobile (AudioContext policy). */
   async speak(text) {
