@@ -130,12 +130,12 @@
     const totalPhrases = (window.__PHRASES || []).length;
     // exam tags with friendly labels + order
     const examTags = [
-      { tag: 'ielts', label: 'IELTS 雅思',   count: TS.ielts || 0 },
-      { tag: 'toefl', label: 'TOEFL 托福',   count: TS.toefl || 0 },
-      { tag: 'cet6',  label: 'CET-6 六级',   count: TS.cet6  || 0 },
-      { tag: 'cet4',  label: 'CET-4 四级',   count: TS.cet4  || 0 },
-      { tag: 'ky',    label: '考研',          count: TS.ky    || 0 },
-      { tag: 'gre',   label: 'GRE',          count: TS.gre   || 0 }
+      { tag: 'ielts', label: 'IELTS',   count: TS.ielts || 0 },
+      { tag: 'toefl', label: 'TOEFL',   count: TS.toefl || 0 },
+      { tag: 'cet6',  label: 'CET-6',   count: TS.cet6  || 0 },
+      { tag: 'cet4',  label: 'CET-4',   count: TS.cet4  || 0 },
+      { tag: 'ky',    label: 'KY',      count: TS.ky    || 0 },
+      { tag: 'gre',   label: 'GRE',     count: TS.gre   || 0 }
     ];
 
     view.innerHTML = `
@@ -148,11 +148,10 @@
           <h3>📚 Vocabulary Bank</h3>
           <span class="vocab-total"><b>${totalBank.toLocaleString()}</b> words · <b>${totalPhrases.toLocaleString()}</b> phrases</span>
         </div>
-        <div class="vocab-chips">
-          ${examTags.map(e => `<span class="vocab-chip"><b>${e.count.toLocaleString()}</b> ${e.label}</span>`).join('')}
-          <span class="vocab-chip"><b>${totalPhrases.toLocaleString()}</b> Phrases 词组</span>
+        <div class="vocab-chips" style="flex-wrap:nowrap;overflow-x:auto;">
+          ${examTags.map(e => `<span class="vocab-chip" style="white-space:nowrap;flex-shrink:0;"><b>${e.count.toLocaleString()}</b> ${e.label.replace(/[\u4e00-\u9fa5]+\s*/g,'')}</span>`).join('')}
+          <span class="vocab-chip" style="white-space:nowrap;flex-shrink:0;"><b>${totalPhrases.toLocaleString()}</b> Phrases</span>
         </div>
-        <div class="muted" style="margin-top:8px;font-size:.8rem;">Words are cross-tagged across exams — one word may belong to several lists.</div>
       </div>
 
       <div class="grid grid-4 section">
@@ -322,9 +321,17 @@
         const fb = $('#fb');
         if (correct) {
           fb.className = 'feedback ok';
-          fb.innerHTML = `✓ Correct! <b>${esc(w.en)}</b>`;
-          window.Store.setErrorField(w.en, { correctCount: (w.correctCount || 0) + 1 });
+          const newCount = (w.correctCount || 0) + 1;
+          window.Store.setErrorField(w.en, { correctCount: newCount });
           window.Store.bump('wordsReviewed');
+          // if word is in Review List and reached 5 consecutive correct, remove it
+          const inReview = window.Store.getErrors().some(e => e.en.toLowerCase() === w.en.toLowerCase());
+          if (inReview && newCount >= 5) {
+            window.Store.removeError(w.en);
+            fb.innerHTML = `✓ Correct! <b>${esc(w.en)}</b> — removed from Review List (5x mastered!)`;
+          } else {
+            fb.innerHTML = `✓ Correct! <b>${esc(w.en)}</b>`;
+          }
           dots[idx] = 'ok';
           renderDots();
           input.disabled = true;
@@ -979,10 +986,14 @@
     window._phDocClick = (e) => { if (!e.target.closest('.autocomplete-wrap')) closePhAuto(); };
     document.addEventListener('click', window._phDocClick);
     searchInput.focus();
-    // show custom phrases initially
-    const custom = window.Store.getCustomPhrases();
-    if (custom.length) doSearch(custom[0].en.split(' ')[0]);
-    else resultsDiv.innerHTML = `<div class="card"><div class="empty"><span class="ico">💬</span><div>Type a word above to find related phrases</div></div></div>`;
+    // on entry: show a random phrase with its meaning and auto-play it
+    const phBank = window.__PHRASES || [];
+    if (phBank.length) {
+      const random = pick(phBank);
+      doSearch(random.en.split(/[\s-]+/)[0]);
+    } else {
+      resultsDiv.innerHTML = `<div class="card"><div class="empty"><span class="ico">💬</span><div>Type a word above to find related phrases</div></div></div>`;
+    }
   }
 
   /* ============================================================
