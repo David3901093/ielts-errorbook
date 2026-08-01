@@ -1160,7 +1160,7 @@
         <button class="btn secondary" id="vExport">⬇ Export</button>
         <button class="btn ghost" id="vReset" title="Reset all local data">Reset</button>
       </div>
-      <div id="vResults"></div>
+      <div id="vResults" style="margin-top:22px;"></div>
     `;
     const resultsDiv = $('#vResults');
     const searchInput = $('#vSearch');
@@ -1175,7 +1175,7 @@
       const phrs = window.Store.getPhrases().filter(p =>
         !ql || p.en.toLowerCase().includes(ql) || (p.cn || '').includes(q));
       resultsDiv.innerHTML = `
-        <div class="grid grid-3 section">
+        <div class="grid grid-3">
           <div class="card"><h3>Bank</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--c2)">${bank.length}</div></div>
           <div class="card"><h3>Review Words</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--bad)">${errs.length}</div></div>
           <div class="card"><h3>Phrases</h3><div class="num" style="font-size:1.6rem;font-weight:700;color:var(--ok)">${phrs.length}</div></div>
