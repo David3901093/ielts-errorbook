@@ -21,9 +21,9 @@ const Audio2 = {
       try { voices = speechSynthesis.getVoices() || []; } catch (e) { voices = []; }
       if (!voices.length) return;
       this._voice =
-        voices.find(v => /en-GB/i.test(v.lang) && /female|natural|samantha/i.test(v.name)) ||
-        voices.find(v => /en-GB/i.test(v.lang)) ||
+        voices.find(v => /en-US/i.test(v.lang) && /female|natural|samantha|zira/i.test(v.name)) ||
         voices.find(v => /en-US/i.test(v.lang)) ||
+        voices.find(v => /en-GB/i.test(v.lang)) ||
         voices.find(v => /^en/i.test(v.lang)) || voices[0];
     };
     pick();
@@ -47,6 +47,15 @@ const Audio2 = {
   },
 
   enabled() { return window.Store.getSettings().sound !== false; },
+
+  /* Auto-play setting (default on). Controls whether pages auto-read on entry. */
+  autoplayEnabled() { return window.Store.getSettings().autoplay !== false; },
+  toggleAutoplay() {
+    const s = window.Store.getSettings();
+    s.autoplay = s.autoplay === false;
+    window.Store.saveSettings(s);
+    return s.autoplay;
+  },
 
   toggle() {
     const s = window.Store.getSettings();
@@ -121,23 +130,25 @@ const Audio2 = {
     try {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-GB'; u.rate = 0.92; u.pitch = 1;
+      u.lang = 'en-US'; u.rate = 0.92; u.pitch = 1;
       if (this._voice) u.voice = this._voice;
       speechSynthesis.speak(u);
       return true;
     } catch (e) { return false; }
   },
 
-  /* ---- Single word speech ---- */
+  /* ---- Single word speech (American English priority) ---- */
   async speakWord(word) {
     if (!word || !this.enabled()) return;
     this._stopCurrent();
-    // 1) howjsay CDN
-    const howjsay = 'https://d1qx7pbj0dvboc.cloudfront.net/' + encodeURIComponent(word.toLowerCase().trim()) + '.mp3';
-    if (await this._playUrl(howjsay, word, 'howjsay')) return;
-    // 2) dictionaryapi.dev
+    const w = encodeURIComponent(word.toLowerCase().trim());
+    // 1) Youdao type=2 (American English) - primary for US accent
+    if (await this._playUrl('https://dict.youdao.com/dictvoice?audio=' + w + '&type=2', word, 'youdao-us')) return;
+    // 2) howjsay CDN (fallback)
+    if (await this._playUrl('https://d1qx7pbj0dvboc.cloudfront.net/' + w + '.mp3', word, 'howjsay')) return;
+    // 3) dictionaryapi.dev
     if (await this._playApiAudio(word)) return;
-    // 3) system TTS
+    // 4) system TTS
     this._systemTts(word);
   },
 
