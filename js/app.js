@@ -870,6 +870,7 @@
       <div class="row section">
         <div class="autocomplete-wrap" style="flex:1;">
           <input id="phSearch" class="input" placeholder="Type a word to find phrases (e.g. take, give, account)..." autocomplete="off" spellcheck="false" />
+          <div class="autocomplete" id="phAuto"></div>
         </div>
         <button class="btn secondary" id="phSearchBtn">Search</button>
       </div>
@@ -877,6 +878,39 @@
     `;
     const resultsDiv = $('#phResults');
     const searchInput = $('#phSearch');
+    const autoBox = $('#phAuto');
+
+    /* ---- phrase autocomplete dropdown ---- */
+    const closePhAuto = () => { autoBox.classList.remove('open'); autoBox.innerHTML = ''; };
+    const refreshPhAuto = () => {
+      const q = searchInput.value.toLowerCase().trim();
+      if (!q) { closePhAuto(); return; }
+      // search the local phrase bank for matches
+      const bank = window.__PHRASES || [];
+      const matches = bank.filter(p => p.en.toLowerCase().includes(q)).slice(0, 10);
+      if (!matches.length) { closePhAuto(); return; }
+      autoBox.innerHTML = matches.map(p =>
+        `<div class="ac-item" data-en="${esc(p.en)}" data-cn="${esc(p.cn || '')}">
+           <span class="ac-word">${highlightMatch(p.en, q)}</span>
+           <span class="ac-cn">${esc((p.cn || '').split(/[；;,]/)[0])}</span>
+           <span class="ac-tag">phrase</span>
+         </div>`).join('');
+      autoBox.classList.add('open');
+    };
+    autoBox.addEventListener('click', e => {
+      const item = e.target.closest('.ac-item');
+      if (item) { searchInput.value = item.dataset.en; closePhAuto(); doSearch(item.dataset.en); }
+    });
+    // keyboard nav: Enter selects first suggestion or searches
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const first = autoBox.querySelector('.ac-item');
+        if (autoBox.classList.contains('open') && first) {
+          searchInput.value = first.dataset.en; closePhAuto();
+        }
+        doSearch(searchInput.value); closePhAuto();
+      } else if (e.key === 'Escape') { closePhAuto(); }
+    });
 
     const doSearch = async (q) => {
       const query = q.toLowerCase().trim();
@@ -930,14 +964,18 @@
       if (all[0]) autoSay(all[0].en);
     };
 
-    // debounced search on input
+    // debounced search + autocomplete on input
     let phTimer = null;
     searchInput.addEventListener('input', e => {
       clearTimeout(phTimer);
+      refreshPhAuto();
       phTimer = setTimeout(() => doSearch(e.target.value), 300);
     });
-    searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(searchInput.value); });
-    $('#phSearchBtn').addEventListener('click', () => doSearch(searchInput.value));
+    $('#phSearchBtn').addEventListener('click', () => { closePhAuto(); doSearch(searchInput.value); });
+    // close dropdown when clicking outside
+    if (window._phDocClick) document.removeEventListener('click', window._phDocClick);
+    window._phDocClick = (e) => { if (!e.target.closest('.autocomplete-wrap')) closePhAuto(); };
+    document.addEventListener('click', window._phDocClick);
     searchInput.focus();
     // show custom phrases initially
     const custom = window.Store.getCustomPhrases();
