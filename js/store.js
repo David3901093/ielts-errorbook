@@ -33,7 +33,7 @@ function write(key, value) {
 }
 
 const Store = {
-  /* ---------- Error Bank ---------- */
+  /* ---------- Review List (personal vocabulary from dictation mistakes) ---------- */
   getErrors() {
     const arr = read(KEY.errorBank, []);
     Store._cleanupLRU(arr);
