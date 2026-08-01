@@ -873,7 +873,7 @@
         </div>
         <button class="btn secondary" id="phSearchBtn">Search</button>
       </div>
-      <div id="phResults"></div>
+      <div id="phResults" style="margin-top:22px;"></div>
     `;
     const resultsDiv = $('#phResults');
     const searchInput = $('#phSearch');
@@ -885,10 +885,20 @@
         return;
       }
       resultsDiv.innerHTML = `<div class="card"><div class="muted">Searching phrases for "${esc(q)}"...</div></div>`;
-      // search: custom phrases + dictionary API phrases
-      const customPhrases = window.Store.getCustomPhrases().filter(p =>
-        p.en.toLowerCase().includes(query) || (p.cn || '').includes(q));
-      const apiPhrases = window.DictAPI.searchPhrases ? await window.DictAPI.searchPhrases(query) : [];
+
+      // fuzzy-match the query to bank words (prefix → substring → Levenshtein)
+      const matchedWords = suggestWords(query, 5).map(w => w.en.toLowerCase());
+      const searchWords = [...new Set([query, ...matchedWords])];
+
+      // search: custom phrases matching any of the matched words
+      const customPhrases = window.Store.getCustomPhrases().filter(p => {
+        const pe = p.en.toLowerCase();
+        return searchWords.some(sw => pe.includes(sw)) || (p.cn || '').includes(q);
+      });
+
+      // search dictionary API for phrases of the top matched word
+      const apiPhrases = window.DictAPI.searchPhrases ? await window.DictAPI.searchPhrases(searchWords[0]) : [];
+
       // merge + dedupe
       const seen = new Set();
       const all = [];
