@@ -127,6 +127,7 @@
 
     const TS = window.IELTS.TAG_STATS || {};
     const totalBank = window.IELTS.BANK.length;
+    const totalPhrases = (window.__PHRASES || []).length;
     // exam tags with friendly labels + order
     const examTags = [
       { tag: 'ielts', label: 'IELTS 雅思',   count: TS.ielts || 0 },
@@ -145,10 +146,11 @@
       <div class="card section vocab-banner">
         <div class="vocab-banner-top">
           <h3>📚 Vocabulary Bank</h3>
-          <span class="vocab-total"><b>${totalBank.toLocaleString()}</b> words in total</span>
+          <span class="vocab-total"><b>${totalBank.toLocaleString()}</b> words · <b>${totalPhrases.toLocaleString()}</b> phrases</span>
         </div>
         <div class="vocab-chips">
           ${examTags.map(e => `<span class="vocab-chip"><b>${e.count.toLocaleString()}</b> ${e.label}</span>`).join('')}
+          <span class="vocab-chip"><b>${totalPhrases.toLocaleString()}</b> Phrases 词组</span>
         </div>
         <div class="muted" style="margin-top:8px;font-size:.8rem;">Words are cross-tagged across exams — one word may belong to several lists.</div>
       </div>
