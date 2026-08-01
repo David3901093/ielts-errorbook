@@ -237,11 +237,14 @@ const Store = {
   getSettings() { return read(KEY.settings, { sound: true, seeded: false, autoplay: true }); },
   saveSettings(s) { write(KEY.settings, s); },
 
-  /* ---------- Error bank starts EMPTY (default 0 words) ----------
-     No built-in seeding. The error bank is populated purely by dictation
-     mistakes (addErrorIfNew) — a true personal error bank that grows
-     from the student's own mistakes. */
+  /* ---------- Review list starts EMPTY (default 0 words) ----------
+     No built-in seeding. Populated purely by dictation mistakes.
+     Also cleans up legacy seed words from older versions. */
   seedIfFirstRun() {
+    // remove legacy seed words (marked seeded:true from old versions)
+    const arr = Store.getErrors();
+    const cleaned = arr.filter(w => !w.seeded);
+    if (cleaned.length !== arr.length) Store.saveErrors(cleaned);
     const s = Store.getSettings();
     if (!s.seeded) { s.seeded = true; Store.saveSettings(s); }
   },
