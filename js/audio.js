@@ -74,19 +74,27 @@ const Audio2 = {
     return s.sound;
   },
 
-  /* Speak arbitrary text (a sentence). Tries online sentence TTS first,
-     then word-by-word audio (works on HarmonyOS), then system speechSynthesis. */
+  /* Speak arbitrary text (a sentence). Priority:
+     1. MeSpeak (pure in-browser synthesis — fluent, no OS voices needed) ← key for HarmonyOS
+     2. online sentence TTS (StreamElements → Google) — where not blocked
+     3. word-by-word audio (howjsay → Youdao) — last-resort fallback
+     4. system speechSynthesis (works only where voices exist) */
   async speak(text) {
     if (!text || !this.enabled()) {
       Diag.log('audio', 'speak() skipped', { reason: !text ? 'empty' : 'disabled' });
       return false;
     }
-    // 1) whole-sentence online TTS (StreamElements → Google) — works where not blocked
+    // 1) MeSpeak pure in-browser TTS (fluent sentences, no system voices)
+    if (window.TTS) {
+      const ok = await window.TTS.speak(text);
+      if (ok) return true;
+    }
+    // 2) whole-sentence online TTS (StreamElements → Google)
     if (await this._playSentence(text)) return true;
-    // 2) word-by-word audio (howjsay/Youdao) — works on HarmonyOS (single-word CDN works)
-    Diag.log('audio', 'sentence TTS blocked, trying word-by-word audio', { text: text.slice(0, 40) });
+    // 3) word-by-word audio (howjsay → Youdao)
+    Diag.log('audio', 'all fluent TTS failed, trying word-by-word audio', { text: text.slice(0, 40) });
     if (await this._playWordByWord(text)) return true;
-    // 3) system speechSynthesis (last resort — fails on HarmonyOS, works elsewhere)
+    // 4) system speechSynthesis (last resort)
     Diag.log('audio', 'word-by-word failed, trying system speechSynthesis', { text: text.slice(0, 40) });
     return this._systemTts(text);
   },
