@@ -97,29 +97,13 @@ html, body {
   background: #fff; color: var(--c2); border-color: #fff;
   box-shadow: 0 4px 14px rgba(0,0,0,.18); font-weight: 600;
 }
-.tab-more-toggle { display: none; }
-.tab-more { display: none; }
 @media (max-width: 880px) {
-  /* compact header: hide brand text, smaller padding */
+  /* compact header: hide brand text, tabs scroll horizontally */
   .topbar { padding: 10px 14px; gap: 10px; flex-wrap: wrap; }
   .brand-name { display: none; }
-  .tabs { flex-wrap: nowrap; overflow-x: auto; gap: 4px; -webkit-overflow-scrolling: touch; }
-  .tab { padding: 7px 12px; font-size: .82rem; flex-shrink: 0; }
-  .tab-more-toggle { display: inline-block; flex-shrink: 0; }
-  /* "more" tabs become a clean dropdown panel instead of inline wrap */
-  .tab-more { display: none; }
-  .tabs.open .tab-more {
-    display: block; position: absolute; top: calc(100% + 4px); left: 14px; right: 14px;
-    z-index: 60; background: rgba(255,255,255,.98); color: var(--text);
-    border-radius: var(--radius-sm); box-shadow: 0 12px 30px rgba(30,64,175,.3);
-    overflow: hidden;
-  }
-  .tabs { position: relative; }
-  .tabs.open .tab-more.tab { /* each more-tab as a full-width row in the dropdown */
-    border: none; border-bottom: 1px solid #eef2f7; border-radius: 0;
-    background: #fff; color: var(--text); padding: 12px 16px; text-align: left;
-  }
-  .tabs.open .tab-more.tab.active { background: var(--grad-soft); color: var(--c2); }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; gap: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 7px 12px; font-size: .82rem; flex-shrink: 0; white-space: nowrap; }
   .score-label { display: none; }
 }
 @media (max-width: 480px) {
