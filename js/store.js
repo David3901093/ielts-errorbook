@@ -34,43 +34,119 @@ function write(key, value) {
 
 const Store = {
   /* ---------- Error Bank ---------- */
-  getErrors() { return read(KEY.errorBank, []); },
+  getErrors() {
+    const arr = read(KEY.errorBank, []);
+    Store._cleanupLRU(arr);
+    return arr;
+  },
   saveErrors(arr) { write(KEY.errorBank, arr); },
+
+  /* LRU cache: max 500 words, 30-day TTL.
+     Words not touched in 30 days are evicted; if over capacity, evict
+     least-recently-used first. Runs on every getErrors() call. */
+  MAX_ERRORS: 500,
+  ERROR_TTL_DAYS: 30,
+  _cleanupLRU(arr) {
+    if (!arr || !arr.length) return arr;
+    const now = Date.now();
+    const ttlMs = Store.ERROR_TTL_DAYS * 86400000;
+    // remove expired (lastSeen or added older than 30 days)
+    let changed = false;
+    const filtered = arr.filter(w => {
+      const ts = w.lastSeen || w.added;
+      if (!ts) return true; // keep if no timestamp (legacy data)
+      const age = now - new Date(ts).getTime();
+      if (age > ttlMs) { changed = true; return false; }
+      return true;
+    });
+    // if still over capacity, evict least-recently-used
+    if (filtered.length > Store.MAX_ERRORS) {
+      filtered.sort((a, b) => {
+        const ta = new Date(a.lastSeen || a.added || 0).getTime();
+        const tb = new Date(b.lastSeen || b.added || 0).getTime();
+        return tb - ta; // newest first
+      });
+      filtered.splice(Store.MAX_ERRORS);
+      changed = true;
+    }
+    if (changed) write(KEY.errorBank, filtered);
+    // mutate in place so caller sees cleaned array
+    if (changed) { arr.length = 0; arr.push(...filtered); }
+    return arr;
+  },
+
   addError(entry) {
-    // entry: { en, cn, misspelled?, added, correctCount, wrongCount, mastered }
     const arr = Store.getErrors();
     const key = entry.en.toLowerCase();
-    if (arr.some(w => w.en.toLowerCase() === key)) return false; // duplicate
-    arr.push({ correctCount: 0, wrongCount: 0, mastered: false, added: todayKey(), ...entry });
+    if (arr.some(w => w.en.toLowerCase() === key)) return false;
+    arr.push({ correctCount: 0, wrongCount: 0, mastered: false, added: todayKey(), lastSeen: todayKey(), ...entry });
+    Store._cleanupLRU(arr);
     Store.saveErrors(arr);
     return true;
   },
+
+  /* Auto-add from dictation: only if the word was actually misspelled.
+     Updates lastSeen for LRU tracking. */
+  addErrorIfNew(entry) {
+    const arr = read(KEY.errorBank, []);
+    const key = (entry.en || '').toLowerCase();
+    if (!key) return false;
+    const existing = arr.find(w => w.en.toLowerCase() === key);
+    if (existing) {
+      // update lastSeen + wrongCount for LRU
+      existing.lastSeen = todayKey();
+      existing.wrongCount = (existing.wrongCount || 0) + 1;
+      if (entry.cn && !existing.cn) existing.cn = entry.cn;
+      write(KEY.errorBank, arr);
+      return false; // already existed
+    }
+    arr.push({
+      en: entry.en, cn: entry.cn || '', misspelled: entry.misspelled || null,
+      source: entry.source || 'dictation',
+      correctCount: 0, wrongCount: 1, mastered: false,
+      added: todayKey(), lastSeen: todayKey()
+    });
+    Store._cleanupLRU(arr);
+    write(KEY.errorBank, arr);
+    return true; // newly added
+  },
+
   removeError(en) {
     Store.saveErrors(Store.getErrors().filter(w => w.en.toLowerCase() !== en.toLowerCase()));
   },
   setErrorField(en, patch) {
     const arr = Store.getErrors();
     const i = arr.findIndex(w => w.en.toLowerCase() === en.toLowerCase());
-    if (i >= 0) { arr[i] = { ...arr[i], ...patch }; Store.saveErrors(arr); }
+    if (i >= 0) {
+      arr[i] = { ...arr[i], ...patch, lastSeen: todayKey() };
+      Store.saveErrors(arr);
+    }
   },
 
   /* ---------- Phrase Bank (CN→EN) ---------- */
-  getPhrases() {
-    const custom = read(KEY.phraseBank, []);
-    // built-in + custom
-    return [...window.IELTS.PHRASES, ...custom];
-  },
+  getPhrases() { return Store.getCustomPhrases(); },
   getCustomPhrases() { return read(KEY.phraseBank, []); },
   addPhrase(entry) {
     const arr = read(KEY.phraseBank, []);
     const key = entry.en.toLowerCase();
     if (arr.some(p => p.en.toLowerCase() === key)) return false;
-    arr.push({ ...entry, added: todayKey() });
+    arr.push({ ...entry, added: todayKey(), lastSeen: todayKey() });
     write(KEY.phraseBank, arr);
     return true;
   },
   removePhrase(en) {
     write(KEY.phraseBank, Store.getCustomPhrases().filter(p => p.en.toLowerCase() !== en.toLowerCase()));
+  },
+
+  /* Phrase search cache for autocomplete */
+  getPhraseCache(word) {
+    const all = read('ieb_phraseCache', {});
+    return all[word.toLowerCase()] || null;
+  },
+  setPhraseCache(word, phrases) {
+    const all = read('ieb_phraseCache', {});
+    all[word.toLowerCase()] = { phrases, cached: todayKey() };
+    write('ieb_phraseCache', all);
   },
 
   /* ---------- Custom example sentences ---------- */
