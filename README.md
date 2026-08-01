@@ -1,97 +1,181 @@
-# 📘 IELTS Vocab Trainer
+# IELTS Vocab Trainer 使用手册
 
-An offline-friendly **IELTS vocabulary trainer** built as a single static web app.
-Turn your frequently misspelled words into a personal error bank, drill them with
-dictation, build a daily review habit, and expand your vocabulary with flip cards
-and a word encyclopedia — all in your browser, no backend required.
+## 一、网站简介
 
-> 100% client-side. All progress is stored in **localStorage**. Deploy free on GitHub Pages.
+IELTS Vocab Trainer 是一个雅思词汇训练网站，集词汇默写、错题管理、词组学习、知识百科于一体。全部数据存储在浏览器本地，无需注册登录，打开即用。
 
----
-
-## ✨ Features
-
-| Module | What it does |
-|---|---|
-| **Dashboard** | Yesterday's recap, today's review prompt, score & streak, quick actions, recommended cards |
-| **Dictation** | Type the English for a random error word. **+1** correct, **−3** wrong |
-| **Error Bank** | Add words you got wrong; fuzzy-matching suggests the correct spelling for you to confirm |
-| **CN → EN** | Daily phrase dictation (Chinese → English); add your own phrases |
-| **Encyclopedia** | Flip cards: phonetics, definitions, examples, synonyms, etymology. Built-in + online (dictionaryapi.dev) + your own sentences |
-| **Cards** | Confusable word pairs & random words as flip cards for contrast memory |
-| **Stats** | Canvas charts: daily score, questions answered, accuracy |
-| **Vocabulary** | Search/filter everything; export a JSON backup; reset |
-| **Calendar** | Monthly check-in grid — qualified vs. unqualified days |
-
-**Daily rule:** if a day's score drops **below 0**, that day is marked **Unqualified**.
+**网址**：https://david3901093.github.io/ielts-errorbook/
 
 ---
 
-## 🎨 Design
+## 二、页面功能说明
 
-- Blue-cyan vibrant gradient (`#0ea5e9 → #2563eb`) with soft glows and glassmorphism cards.
-- Card-based modern stream/grid layout, flat buttons, micro-animations for feedback.
-- English-first UI (the **CN → EN** module is the only Chinese section, for exam realism).
-- Pronunciation via the browser **Web Speech API**, with real-audio fallback from the dictionary API.
+### 1. Dashboard（首页）
+
+首页是你的学习总览中心，包含以下内容：
+
+- **顶部栏**：显示总分（SCORE）、发音开关（🔊）、自动播放开关（Auto 滑块）
+- **词库统计横幅**：显示总词汇量和各考试词库的数量（IELTS 5040 / TOEFL 5668 / CET-6 3232 / CET-4 2244 / 考研 3158 / GRE 2157 / 词组 18466）
+- **四项数据卡片**：总分、今日得分、连续打卡天数、复习词数量
+- **昨日回顾**：昨天录入的单词数、正确率、得分、复习状态
+- **快捷入口**：一键进入默写、中译英、知识卡片
+- **今日推荐卡片**：随机推荐3个单词卡片，鼠标悬停自动发音，点击翻转可看释义和例句
+
+### 2. Dictation（默写）
+
+这是核心练习页面。进入后先选择词单：
+
+- **🔀 Mixed Review（混合复习）**：你的错题词和自定义词组混合打乱默写
+- **📕 Review List（复习清单）**：只默写你之前答错的词（系统自动收集）
+- **📘 IELTS 雅思**：从5040个雅思词汇中随机抽取
+- **📗 TOEFL 托福**：从5668个托福词汇中随机抽取
+- **📙 CET-4 四级 / 📓 CET-6 六级 / 📔 考研**：对应考试词库
+
+**默写流程**：
+1. 屏幕显示中文释义和字母数提示，自动播放单词发音
+2. 在输入框打出英文单词，按 Enter 或点 Check 核对
+3. **答对**：显示"✓ Correct"，1.2秒后自动进入下一题（右滑动画）
+4. **答错**：显示正确答案和发音按钮，等你看完后手动点 Next 进入下一题
+5. **答错的词自动加入复习清单**；答对的词如果在复习清单中累计答对5次，会自动移除（已掌握）
+
+**计分规则**：答对 +1 分，答错 -3 分。当日积分低于0则标记为"不合格"。
+
+### 3. Review List（复习清单）
+
+这是你的个人错题本，**初始为空**，完全由默写答错自动积累，不预置任何内置单词。
+
+- **添加单词**：手动输入英文单词和中文释义，系统会自动检测拼写并建议正确写法
+- **LRU缓存机制**：复习清单最多保存500个词，超过30天未复习的词自动清除
+- 每个词显示：单词、中文、发音按钮、掌握标记（✓）、删除按钮（✕）
+- 点击 ✓ 标记为已掌握，已掌握的词不再出现在默写中
+
+### 4. CN → EN（中译英）
+
+这是唯一使用中文界面的页面，用于词组默写。
+
+- 看中文释义，打出对应的英文词组
+- 可以手动添加待默写的词组（输入英文词组+中文翻译）
+- 计分规则与默写相同（+1/-3）
+
+### 5. Encyclopedia（单词百科）
+
+这是单词查询和学习页面。
+
+- **搜索框**：输入单词时自动弹出模糊匹配下拉框（前缀匹配优先，支持拼写纠错）
+- **词组联想**：搜索单词时同时显示包含该词的词组
+- **单词详情卡片**：显示音标、中文释义、英文释义、例句（带朗读）、同义词、反义词、词源
+- 点击例句旁的 🔊 可朗读整句（PC端有效，鸿蒙端可能不支持句子朗读）
+- 点击 🎲 Random 随机查看一个单词
+
+### 6. Phrases（词组学习）
+
+专门用于词组和搭配的学习页面。
+
+- **搜索框**：输入单词时自动弹出词组联想下拉框（从18466个词组中模糊匹配）
+- 进入页面时随机展示一个词组
+- 每个词组卡片显示：英文词组、中文释义、例句（英中对照，带朗读）
+- 鼠标悬停词组卡片自动发音
+- 例句数据来自 Tatoeba 开源例句库
+
+### 7. Cards（知识卡片）
+
+通过翻转卡片进行对比记忆。
+
+- **🔀 Synonyms（近义词）**：随机生成近义词配对
+- **⚡ Antonyms（反义词）**：随机生成反义词配对
+- **🤔 Confusable（易混淆）**：精选易混淆词对（如 affect/effect、adapt/adopt）
+- **🎲 Random Words（随机词）**：随机单词翻转卡
+- **🔄 New Set**：重新洗牌当前模式
+- **鼠标悬停卡片自动发音**，点击卡片翻转
+
+### 8. Stats（统计图表）
+
+- 准确率（14天）、答对数、答错数、最佳连续天数
+- 每日得分趋势图（折线图）
+- 每日答题量（柱状图）
+- 每日正确率（柱状图）
+
+### 9. Vocabulary（词库总览）
+
+- 搜索全部词库（内置词库+复习清单+词组），支持英文和中文搜索
+- 显示各类词的数量统计
+- 可导出JSON备份文件
+- 可重置所有本地数据
+
+### 10. Calendar（打卡日历）
+
+- 月历视图，绿色=合格日，黄色=不合格日（当日积分低于0）
+- 显示合格天数、不合格天数、当前连续天数
+- 每个日期格子显示当日得分
 
 ---
 
-## 🗂️ Project structure
+## 三、发音功能说明
 
-```
-ielts-errorbook/
-├── index.html          # SPA shell + top tab bar
-├── css/style.css       # Blue-cyan theme, cards, animations
-├── js/
-│   ├── data.js         # Built-in IELTS words + phrases + examples + etymology
-│   ├── store.js        # localStorage layer (errors, phrases, progress, settings)
-│   ├── fuzzy.js        # Levenshtein distance → spelling suggestions
-│   ├── api.js          # dictionaryapi.dev wrapper (silent degradation)
-│   ├── audio.js        # Web Speech API pronunciation + audio fallback
-│   ├── charts.js       # Native-canvas line/bar charts (no library)
-│   └── app.js          # Router + page renderers + interactions
-├── README.md
-└── .gitignore
-```
+### 悬浮发音（Hover-to-Speak）
 
----
+- 鼠标悬停在首页推荐卡片、知识卡片、词组卡片上时，**自动朗读该词/词组的美音发音**
+- 鼠标移走再回来可以再次触发
+- 这是主要的发音交互方式，无需反复点击按钮
 
-## 🚀 Run locally
+### 自动播放
 
-No build step. Just open `index.html` in a modern browser:
+- 右上角有 Auto 滑块开关，默认开启
+- 开启时：默写页面显示题目时自动朗读单词
+- 关闭时：只有鼠标悬浮或手动点击 🔊 才会发音
+- 首页不再自动播放发音，改为鼠标悬浮触发
 
-```bash
-# Option A: double-click index.html
+### 发音来源（美式英语）
 
-# Option B: serve locally (recommended, avoids file:// quirks)
-python -m http.server 8000
-# then visit http://localhost:8000
-```
+- 单词发音：优先使用有道词典美音 → howjsay词典 → dictionaryapi.dev → 系统TTS
+- 句子发音：优先使用系统TTS（需有语音引擎）→ MeSpeak浏览器内合成 → 在线TTS
+
+### 鸿蒙系统说明
+
+鸿蒙华为浏览器没有TTS语音引擎，因此：
+- **单词发音正常**（通过有道/howjsay的音频文件播放）
+- **句子朗读可能不可用**，会显示英文提示："This browser does not support sentence audio"
 
 ---
 
-## 🌐 Deploy to GitHub Pages
+## 四、计分与打卡规则
 
-1. Push this folder to a GitHub repository.
-2. In the repo: **Settings → Pages → Source → Deploy from a branch → `main` / `(root)`**.
-3. Save. Your site goes live at `https://<your-username>.github.io/<repo-name>/` in ~1 minute.
-
----
-
-## 🔌 Data sources
-
-- **Built-in vocabulary** was extracted from IELTS worksheets (the red/high-error words seed the error bank).
-- **Online enrichment** (phonetics, extra examples, synonyms) comes from the free
-  [dictionaryapi.dev](https://dictionaryapi.dev) — no API key, CORS-friendly.
-- If offline or the API is rate-limited, the app **silently degrades** to built-in data and never blocks learning.
+| 项目         | 规则                                              |
+| ------------ | ------------------------------------------------- |
+| 答对         | +1 分                                             |
+| 答错         | -3 分                                             |
+| 当日积分 < 0 | 当日标记为"不合格"（Unqualified）                 |
+| 连续打卡     | 每天打开网页自动记录，连续天数显示在首页          |
+| 数据存储     | 全部存在浏览器 localStorage，清除浏览器数据会丢失 |
 
 ---
 
-## 💾 Backup & reset
+## 五、数据说明
 
-Open **Vocabulary → Export JSON** to download all your local data (error bank, phrases,
-progress) as a backup. Use **Reset** on the same page to clear everything and re-seed.
+| 数据       | 来源                               | 数量              |
+| ---------- | ---------------------------------- | ----------------- |
+| 单词词库   | AlphaYuU官方词库 + ladrift托福词库 | 7,892词           |
+| 词组库     | ECDICT词典 + 手写雅思搭配          | 18,466条          |
+| 词组例句   | Tatoeba开源例句库                  | 181条（持续增加） |
+| 复习清单   | 默认为空，由默写答错自动积累       | 0个（动态增长）   |
+
+> 注：早期版本预置了20个从工作表图片识别的红色错题词作为种子数据，最新版本已移除，复习清单完全由学生的学习行为驱动。
 
 ---
 
-Built for focused, exam-ready IELTS practice. Good luck! 🎯
+## 六、常见问题
+
+**Q：复习清单为什么是空的？**
+A：复习清单默认为空（不再预置内置单词），只有你在默写中答错的词才会自动加入。
+
+**Q：怎么添加自己的词组？**
+A：在中译英页面或词组学习页面的搜索框可以添加自定义词组。
+
+**Q：数据会丢失吗？**
+A：数据存在浏览器本地。清除浏览器缓存/数据会丢失。建议定期去 Vocabulary 页面导出JSON备份。
+
+**Q：手机上能用吗？**
+A：可以。导航栏在手机上会变为水平滑动，所有功能均可用。部分旧手机浏览器可能不支持句子朗读。
+
+**Q：怎么重置所有数据？**
+A：Vocabulary 页面 → Reset 按钮 → 确认后清除全部本地数据。
