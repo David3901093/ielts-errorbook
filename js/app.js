@@ -198,14 +198,17 @@
   /* Word-list picker: choose a vocabulary level (or the error bank) to dictate. */
   function showDictationPicker() {
     const errors = window.Store.getErrors().filter(e => !e.mastered);
+    const phrases = window.Store.getCustomPhrases();
+    const mixCount = errors.length + phrases.length;
     const TS = window.IELTS.TAG_STATS || {};
     const lists = [
-      { key: 'errors',  label: '📕 Error Bank',        count: errors.length, desc: 'Your personal misspelled words' },
-      { key: 'ielts',   label: '📘 IELTS 雅思',         count: TS.ielts || 0, desc: 'IELTS core vocabulary' },
-      { key: 'toefl',   label: '📗 TOEFL 托福',         count: TS.toefl || 0, desc: 'TOEFL vocabulary' },
-      { key: 'cet4',    label: '📙 CET-4 四级',         count: TS.cet4  || 0, desc: 'College English Test Band 4' },
-      { key: 'cet6',    label: '📓 CET-6 六级',         count: TS.cet6  || 0, desc: 'College English Test Band 6' },
-      { key: 'ky',      label: '📔 考研',               count: TS.ky    || 0, desc: 'Postgraduate entrance exam' }
+      { key: 'mix',     label: '🔀 Mixed Review',      count: mixCount,         desc: 'Error words + your phrases, shuffled together' },
+      { key: 'errors',  label: '📕 Error Bank',        count: errors.length,    desc: 'Your personal misspelled words (auto-collected)' },
+      { key: 'ielts',   label: '📘 IELTS 雅思',         count: TS.ielts || 0,    desc: 'IELTS core vocabulary' },
+      { key: 'toefl',   label: '📗 TOEFL 托福',         count: TS.toefl || 0,    desc: 'TOEFL vocabulary' },
+      { key: 'cet4',    label: '📙 CET-4 四级',         count: TS.cet4  || 0,    desc: 'College English Test Band 4' },
+      { key: 'cet6',    label: '📓 CET-6 六级',         count: TS.cet6  || 0,    desc: 'College English Test Band 6' },
+      { key: 'ky',      label: '📔 考研',               count: TS.ky    || 0,    desc: 'Postgraduate entrance exam' }
     ];
     view.innerHTML = `
       <h1 class="page-title">Dictation</h1>
@@ -232,13 +235,21 @@
 
   /* Build the word queue for the chosen list and run a session. */
   function startDictation(listKey, errors) {
+    const errors2 = window.Store.getErrors().filter(e => !e.mastered);
+    const phrases = window.Store.getCustomPhrases();
     let pool = [];
     let label = '';
-    if (listKey === 'errors') {
-      pool = errors;
+    if (listKey === 'mix') {
+      // combine error words + custom phrases into one shuffled pool
+      pool = [...errors2.map(e => ({ en: e.en, cn: e.cn, type: 'word' })),
+              ...phrases.map(p => ({ en: p.en, cn: p.cn, type: 'phrase' }))];
+      label = 'Mixed Review';
+    } else if (listKey === 'errors') {
+      pool = errors2.map(e => ({ en: e.en, cn: e.cn, type: 'word' }));
       label = 'Error Bank';
     } else {
-      pool = window.IELTS.BANK.filter(w => (w.tags || '').split(/\s+/).includes(listKey) && w.cn);
+      pool = window.IELTS.BANK.filter(w => (w.tags || '').split(/\s+/).includes(listKey) && w.cn)
+        .map(w => ({ en: w.en, cn: w.cn, type: 'word' }));
       const names = { ielts: 'IELTS', toefl: 'TOEFL', cet4: 'CET-4', cet6: 'CET-6', ky: '考研' };
       label = names[listKey] || listKey;
     }
@@ -261,7 +272,7 @@
       view.innerHTML = `
         <h1 class="page-title">Dictation · ${esc(label)}</h1>
         <p class="page-sub">Type the English word for the meaning shown. <b>+1</b> correct, <b>−3</b> wrong.</p>
-        <div class="card dictate-box dictate-card" style="max-width:560px;margin-left:auto;margin-right:auto;">
+        <div class="card dictate-box dictate-card slide-in" style="max-width:560px;margin-left:auto;margin-right:auto;">
           <div class="row card-top" style="justify-content:space-between;">
             <span class="badge">Word ${idx + 1} / ${queue.length}</span>
             <button class="icon-btn" id="sayBtn" title="Hear pronunciation">🔊</button>
@@ -297,19 +308,27 @@
           window.Store.setErrorField(w.en, { correctCount: (w.correctCount || 0) + 1 });
           window.Store.bump('wordsReviewed');
           dots[idx] = 'ok';
+          renderDots();
+          input.disabled = true;
+          // auto-advance after 1.2s
+          setTimeout(() => { if (idx + 1 < queue.length) next(); else finishSession(); }, 1200);
         } else {
+          // wrong: add word to error bank automatically (phrases excluded), show answer
+          if (w.type !== 'phrase') {
+            window.Store.addErrorIfNew({ en: w.en, cn: w.cn, source: 'dictation' });
+            window.Store.setErrorField(w.en, { wrongCount: (w.wrongCount || 0) + 1 });
+          }
           fb.className = 'feedback bad';
           fb.innerHTML = `✗ Correct answer: <button class="say-inline" data-say="${esc(w.en)}" title="Read aloud">🔊</button><b>${esc(w.en)}</b> (you wrote "${esc(ans)}")`;
           const sb = fb.querySelector('[data-say]');
           if (sb) sb.addEventListener('click', () => window.Audio2.speakWord(w.en));
-          window.Store.setErrorField(w.en, { wrongCount: (w.wrongCount || 0) + 1 });
           dots[idx] = 'bad';
           $('#dInput').classList.add('shake');
+          renderDots();
+          input.disabled = true;
+          $('#checkBtn').textContent = idx + 1 < queue.length ? 'Next →' : 'Finish ✓';
+          $('#checkBtn').onclick = next;
         }
-        renderDots();
-        input.disabled = true;
-        $('#checkBtn').textContent = idx + 1 < queue.length ? 'Next →' : 'Finish ✓';
-        $('#checkBtn').onclick = next;
       };
       const next = () => {
         idx++;
@@ -733,10 +752,11 @@
 
     const refreshAuto = () => {
       const q = $('#encSearch').value;
-      acList = suggestWords(q, 10);
-      if (!q.trim() || !acList.length) {
-        autoBox.innerHTML = q.trim() ? `<div class="ac-empty">No matches for “${esc(q)}”.</div>` : '';
-        autoBox.classList.toggle('open', !!q.trim());
+      acList = suggestWords(q, 8);
+      if (!q.trim()) { closeAuto(); return; }
+      if (!acList.length) {
+        autoBox.innerHTML = `<div class="ac-empty">No matches for “${esc(q)}”.</div>`;
+        autoBox.classList.add('open');
         acActive = -1;
         return;
       }
@@ -748,6 +768,19 @@
          </div>`).join('');
       acActive = -1;
       autoBox.classList.add('open');
+      // async: fetch phrase suggestions and append below word matches
+      if (q.trim().length >= 2 && window.DictAPI.searchPhrases) {
+        window.DictAPI.searchPhrases(q.trim()).then(phrases => {
+          if (!phrases.length || !autoBox.classList.contains('open')) return;
+          const phraseHtml = phrases.map((p, i) =>
+            `<div class="ac-item ac-phrase" data-phrase="${esc(p.en)}">
+               <span class="ac-word">💬 ${esc(p.en)}</span>
+               <span class="ac-cn">${esc(p.cn || 'phrase')}</span>
+               <span class="ac-tag">phrase</span>
+             </div>`).join('');
+          autoBox.insertAdjacentHTML('beforeend', phraseHtml);
+        });
+      }
     };
 
     // typing → refresh suggestions (debounced)
@@ -773,10 +806,18 @@
         closeAuto();
       }
     });
-    // click a suggestion
+    // click a suggestion (word or phrase)
     autoBox.addEventListener('click', e => {
       const item = e.target.closest('.ac-item');
-      if (item && acList[+item.dataset.i]) choose(acList[+item.dataset.i]);
+      if (!item) return;
+      if (item.dataset.i != null && acList[+item.dataset.i]) {
+        choose(acList[+item.dataset.i]);
+      } else if (item.dataset.phrase) {
+        // phrase suggestion: fill search box and look it up
+        $('#encSearch').value = item.dataset.phrase;
+        closeAuto();
+        show(item.dataset.phrase);
+      }
     });
     // close when clicking outside the search area
     if (window._encDocClick) document.removeEventListener('click', window._encDocClick);
