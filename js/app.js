@@ -199,8 +199,6 @@
     const picks = shuffle(pool).slice(0, 3);
     const wrap = $('#homeCards');
     picks.forEach(w => wrap.appendChild(buildFlipCard(w)));
-    // auto-play the first recommended card's word
-    if (picks[0]) autoSay(picks[0].en);
   }
 
   /* ============================================================
@@ -960,7 +958,7 @@
         ${all.map(p => {
           const examples = exBank[p.en.toLowerCase()] || [];
           return `
-          <div class="card section" style="margin-bottom:16px;">
+          <div class="card section" style="margin-bottom:16px;" data-en="${esc(p.en)}">
             <div class="row" style="justify-content:space-between;align-items:flex-start;">
               <div>
                 <h2 style="font-size:1.4rem;margin:0;">${esc(p.en)}</h2>
@@ -983,8 +981,14 @@
       // wire pronunciation
       resultsDiv.querySelectorAll('[data-say]').forEach(b =>
         b.addEventListener('click', e => { e.stopPropagation(); window.Audio2.speakWord(b.dataset.say); }));
-      // auto-play the first phrase
-      if (all[0]) autoSay(all[0].en);
+      // hover-to-speak on each phrase card
+      resultsDiv.querySelectorAll('.card[data-en]').forEach(card => {
+        let played = false;
+        card.addEventListener('mouseenter', () => {
+          if (!played) { played = true; window.Audio2.speakWord(card.dataset.en); }
+        });
+        card.addEventListener('mouseleave', () => { played = false; });
+      });
     };
 
     // debounced search + autocomplete on input
@@ -1175,6 +1179,12 @@
       card.classList.toggle('flipped');
       window.Audio2.speakWord(word);
     });
+    // hover-to-speak: pronounce on mouseenter (desktop)
+    let hoverPlayed = false;
+    wrap.addEventListener('mouseenter', () => {
+      if (!hoverPlayed) { hoverPlayed = true; window.Audio2.speakWord(word); }
+    });
+    wrap.addEventListener('mouseleave', () => { hoverPlayed = false; });
     // wire up per-example read-aloud buttons (on the back face)
     wrap.querySelectorAll('[data-say]').forEach(b =>
       b.addEventListener('click', e => {
