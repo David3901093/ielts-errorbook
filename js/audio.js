@@ -74,20 +74,47 @@ const Audio2 = {
     return s.sound;
   },
 
-  /* Speak arbitrary text (a sentence). Tries online TTS providers first
-     (works on HarmonyOS where system speechSynthesis has no voices), then
-     falls back to the browser's built-in TTS on platforms that support it. */
+  /* Speak arbitrary text (a sentence). Tries online sentence TTS first,
+     then word-by-word audio (works on HarmonyOS), then system speechSynthesis. */
   async speak(text) {
     if (!text || !this.enabled()) {
       Diag.log('audio', 'speak() skipped', { reason: !text ? 'empty' : 'disabled' });
       return false;
     }
-    // 1) online sentence TTS (StreamElements → Google), plays via <audio src>
-    const ok = await this._playSentence(text);
-    if (ok) return true;
-    // 2) fall back to browser speechSynthesis (works where voices exist)
-    Diag.log('audio', 'sentence TTS failed, trying system speechSynthesis', { text: text.slice(0, 40) });
+    // 1) whole-sentence online TTS (StreamElements → Google) — works where not blocked
+    if (await this._playSentence(text)) return true;
+    // 2) word-by-word audio (howjsay/Youdao) — works on HarmonyOS (single-word CDN works)
+    Diag.log('audio', 'sentence TTS blocked, trying word-by-word audio', { text: text.slice(0, 40) });
+    if (await this._playWordByWord(text)) return true;
+    // 3) system speechSynthesis (last resort — fails on HarmonyOS, works elsewhere)
+    Diag.log('audio', 'word-by-word failed, trying system speechSynthesis', { text: text.slice(0, 40) });
     return this._systemTts(text);
+  },
+
+  /* Last-resort sentence reader for HarmonyOS: split the sentence into words
+     and play each word's audio (howjsay → Youdao) sequentially. Skips
+     punctuation. Works because single-word CDN audio plays fine there. */
+  async _playWordByWord(text) {
+    const words = (text.match(/[a-zA-Z'-]+/g) || []).filter(w => w.length > 1);
+    if (!words.length) return false;
+    Diag.log('audio', 'word-by-word: starting', { count: words.length, words: words.slice(0, 8).join(' ') });
+    let playedAny = false;
+    for (const w of words) {
+      // try howjsay first, then youdao
+      const urls = [
+        'https://d1qx7pbj0dvboc.cloudfront.net/' + encodeURIComponent(w.toLowerCase()) + '.mp3',
+        'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(w.toLowerCase()) + '&type=2'
+      ];
+      let wordOk = false;
+      for (const url of urls) {
+        if (await this._playUrl(url, w, 'wordconcat', 2500)) { wordOk = true; break; }
+      }
+      if (wordOk) playedAny = true;
+      // brief gap between words for clarity
+      await new Promise(r => setTimeout(r, 120));
+    }
+    Diag.log('audio', 'word-by-word: done', { playedAny });
+    return playedAny;
   },
 
   /* Build TTS URLs for a sentence (no key needed, played via <audio src>). */
@@ -167,7 +194,7 @@ const Audio2 = {
   },
 
   /* Play a direct audio URL via <audio> element. Resolves true if it played. */
-  _playUrl(url, word, source) {
+  _playUrl(url, word, source, timeoutMs) {
     return new Promise(resolve => {
       try {
         const a = new Audio(url);
@@ -179,7 +206,7 @@ const Audio2 = {
         };
         a.onended = () => done(true, { event: 'ended' });
         a.onerror = () => done(false, { event: 'error', code: a.error ? a.error.code : 'n/a' });
-        setTimeout(() => done(false, { event: 'timeout' }), 5000);
+        setTimeout(() => done(false, { event: 'timeout' }), timeoutMs || 5000);
         const p = a.play();
         if (p && typeof p.then === 'function') {
           p.then(() => Diag.log('audio', `<audio:${source}> play() resolved`, { word }))
