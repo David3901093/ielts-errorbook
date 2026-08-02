@@ -521,13 +521,13 @@
     const reviewWords = window.Store.getErrors().filter(e => !e.mastered);
     const mixCount = phrases.length + reviewWords.length;
     const lists = [
-      { key: 'mix',  label: '🔀 混合默写',  count: mixCount, desc: '词组 + 复习单词混合' },
-      { key: 'phr',  label: '💬 词组默写',  count: phrases.length, desc: '所有自定义词组' },
-      { key: 'rev',  label: '📕 复习单词',  count: reviewWords.length, desc: '复习清单中的单词' }
+      { key: 'mix',  label: '🔀 Mixed',   count: mixCount, desc: 'Phrases + review words shuffled' },
+      { key: 'phr',  label: '💬 Phrases',  count: phrases.length, desc: 'All custom phrases' },
+      { key: 'rev',  label: '📕 Review Words', count: reviewWords.length, desc: 'Words from your review list' }
     ];
     view.innerHTML = `
-      <h1 class="page-title" style="color:var(--text);text-shadow:none;">中译英 · CN → EN</h1>
-      <p class="page-sub" style="color:var(--text-soft);text-shadow:none;">看中文，默写英文。做对 +1，做错 −3。</p>
+      <h1 class="page-title">CN → EN</h1>
+      <p class="page-sub">Read the Chinese, type the English. +1 correct, −3 wrong.</p>
       <div class="grid grid-2 section">
         ${lists.map(l => `
           <div class="card list-pick ${l.count === 0 ? 'disabled' : ''}" data-list="${l.key}">
@@ -538,21 +538,21 @@
               </div>
               <span class="badge">${l.count} items</span>
             </div>
-            <button class="btn small" style="margin-top:14px;" ${l.count === 0 ? 'disabled' : ''}>开始 →</button>
+            <button class="btn small" style="margin-top:14px;" ${l.count === 0 ? 'disabled' : ''}>Start →</button>
           </div>`).join('')}
       </div>
 
       <div class="card section">
-        <h3>➕ 添加词组/单词</h3>
+        <h3>➕ Add Word / Phrase</h3>
         <div class="row">
-          <input id="phEn" class="input" placeholder="英文 English word or phrase" style="flex:2;" />
-          <input id="phCn" class="input" placeholder="中文翻译 Chinese" style="flex:2;" />
-          <button class="btn" id="phAdd">添加</button>
+          <input id="phEn" class="input" placeholder="English word or phrase" style="flex:2;" />
+          <input id="phCn" class="input" placeholder="中文意思 Chinese" style="flex:2;" />
+          <button class="btn" id="phAdd">Add</button>
         </div>
       </div>
 
       <div class="card section">
-        <h3>📚 我的词组库 (共 ${phrases.length})</h3>
+        <h3>📚 My Phrases (${phrases.length})</h3>
         <ul class="word-list">
           ${phrases.map(p => `
             <li class="word-item">
@@ -604,20 +604,20 @@
     const draw = () => {
       const p = queue[i];
       view.innerHTML = `
-        <h1 class="page-title" style="color:var(--text);text-shadow:none;">中译英 · ${i + 1} / ${queue.length}</h1>
-        <p class="page-sub" style="color:var(--text-soft);text-shadow:none;">看中文，默写英文。做对 +1，做错 −3。</p>
+        <h1 class="page-title">CN → EN · ${i + 1} / ${queue.length}</h1>
+        <p class="page-sub">Read the Chinese, type the English. +1 correct, −3 wrong.</p>
         <div class="card dictate-box dictate-card slide-in" style="max-width:560px;margin:0 auto;">
           <div class="row card-top" style="justify-content:space-between;">
             <span class="badge">${i + 1} / ${queue.length}</span>
             <button class="icon-btn" id="cnSay" title="Hear pronunciation">🔊</button>
           </div>
           <h2 class="word-cn">${esc(p.cn)}</h2>
-          <input id="cnInput" class="input dictate-input" placeholder="输入英文..." autocomplete="off" spellcheck="false" />
+          <input id="cnInput" class="input dictate-input" placeholder="Type the English..." autocomplete="off" spellcheck="false" />
           <div class="feedback" id="cnFb"></div>
           <div class="row" style="justify-content:center;margin-top:18px;">
-            <button class="btn" id="cnCheck">核对</button>
-            <button class="btn secondary" id="cnSkip">跳过</button>
-            <button class="btn ghost" id="cnBack">◂ 返回</button>
+            <button class="btn" id="cnCheck">Check</button>
+            <button class="btn secondary" id="cnSkip">Skip</button>
+            <button class="btn ghost" id="cnBack">◂ Back</button>
           </div>
         </div>
       `;
@@ -638,18 +638,18 @@
         const fb = $('#cnFb');
         if (correct) {
           fb.className = 'feedback ok';
-          fb.innerHTML = `✓ 正确！<b>${esc(p.en)}</b>`;
+          fb.innerHTML = `✓ Correct! <b>${esc(p.en)}</b>`;
           window.Store.bump('cnEnDone');
           input.disabled = true;
           setTimeout(() => { i++; if (i >= queue.length) finishCnEn(); else draw(); }, 1200);
         } else {
           window.Store.addPhrase({ en: p.en, cn: p.cn });
           fb.className = 'feedback bad';
-          fb.innerHTML = `✗ 正确答案：<button class="say-inline" data-say="${esc(p.en)}" title="Read aloud">🔊</button><b>${esc(p.en)}</b>`;
+          fb.innerHTML = `✗ Correct answer: <button class="say-inline" data-say="${esc(p.en)}" title="Read aloud">🔊</button><b>${esc(p.en)}</b>`;
           const sb = fb.querySelector('[data-say]');
           if (sb) sb.addEventListener('click', () => window.Audio2.speakWord(p.en));
           input.disabled = true;
-          $('#cnCheck').textContent = i + 1 < queue.length ? '下一个 →' : '完成 ✓';
+          $('#cnCheck').textContent = i + 1 < queue.length ? 'Next →' : 'Finish ✓';
           $('#cnCheck').onclick = () => { i++; if (i >= queue.length) finishCnEn(); else draw(); };
         }
       };
@@ -665,17 +665,17 @@
   function finishCnEn() {
     const d = window.Store.getDay();
     view.innerHTML = `
-      <h1 class="page-title" style="color:var(--text);text-shadow:none;">完成 🎉</h1>
+      <h1 class="page-title">Session Complete 🎉</h1>
       <div class="card" style="max-width:560px;margin:0 auto;text-align:center;">
         <div class="grid grid-3">
           <div class="stat"><div class="num">${d.correct}</div><div class="lbl">CORRECT</div></div>
           <div class="stat"><div class="num">${d.wrong}</div><div class="lbl">WRONG</div></div>
           <div class="stat"><div class="num" style="color:${d.score < 0 ? 'var(--fail)' : 'inherit'}">${d.score}</div><div class="lbl">TODAY</div></div>
         </div>
-        <p class="muted" style="margin-top:14px;">${d.score < 0 ? '⚠️ 今日不合格（积分低于0）' : '做得好！继续保持！'}</p>
+        <p class="muted" style="margin-top:14px;">${d.score < 0 ? '⚠️ Today is Unqualified (score below 0).' : 'Nice job — keep it up!'}</p>
         <div class="row" style="justify-content:center;margin-top:14px;">
-          <button class="btn" id="cnAgain">再来一轮</button>
-          <button class="btn secondary" id="cnLists">◂ 返回列表</button>
+          <button class="btn" id="cnAgain">Again</button>
+          <button class="btn secondary" id="cnLists">◂ Lists</button>
         </div>
       </div>`;
     $('#cnAgain').addEventListener('click', () => showCnEnPicker());
