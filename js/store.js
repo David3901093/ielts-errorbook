@@ -245,36 +245,38 @@ const Store = {
     const arr = Store.getErrors();
     const cleaned = arr.filter(w => !w.seeded);
     if (cleaned.length !== arr.length) Store.saveErrors(cleaned);
-    // seed built-in IELTS phrases (only once, tracked by phraseSeeded flag)
+    // seed 10 high-frequency commonly-misspelled words + 10 IELTS phrases
     const s = Store.getSettings();
     if (!s.phraseSeeded) {
       const BUILTIN = [
-        { en: 'take into account', cn: '考虑到；把…计算在内' },
-        { en: 'in terms of', cn: '就…而言；在…方面' },
-        { en: 'play a role in', cn: '在…中起作用' },
-        { en: 'give rise to', cn: '引起；导致' },
-        { en: 'be exposed to', cn: '暴露于；接触到' },
-        { en: 'regardless of', cn: '不管；不顾' },
-        { en: 'in addition to', cn: '除…之外' },
-        { en: 'draw a conclusion', cn: '得出结论' },
-        { en: 'be attributed to', cn: '归因于' },
-        { en: 'be consistent with', cn: '与…一致' },
-        { en: 'carry out', cn: '执行；开展' },
-        { en: 'focus on', cn: '集中于；关注' },
-        { en: 'put forward', cn: '提出' },
-        { en: 'be aware of', cn: '意识到' },
-        { en: 'as well as', cn: '以及；也' },
-        { en: 'on the contrary', cn: '相反' },
-        { en: 'in the long run', cn: '从长远来看' },
-        { en: 'as a matter of fact', cn: '事实上' },
-        { en: 'to a certain extent', cn: '在某种程度上' },
-        { en: 'keep pace with', cn: '与…并驾齐驱' }
+        // 10 commonly misspelled high-frequency words
+        { en: 'necessary',     cn: '必要的',          type: 'word' },
+        { en: 'accommodate',   cn: '容纳；适应',      type: 'word' },
+        { en: 'definitely',    cn: '明确地',          type: 'word' },
+        { en: 'embarrass',     cn: '使尴尬',          type: 'word' },
+        { en: 'occurrence',    cn: '发生；事件',      type: 'word' },
+        { en: 'privilege',     cn: '特权',            type: 'word' },
+        { en: 'separate',      cn: '分开的',          type: 'word' },
+        { en: 'rhythm',        cn: '节奏',            type: 'word' },
+        { en: 'liaison',       cn: '联络',            type: 'word' },
+        { en: 'conscience',    cn: '良心',            type: 'word' },
+        // 10 high-frequency IELTS phrases
+        { en: 'take into account', cn: '考虑到；把…计算在内', type: 'phrase' },
+        { en: 'in terms of',       cn: '就…而言；在…方面',   type: 'phrase' },
+        { en: 'give rise to',      cn: '引起；导致',         type: 'phrase' },
+        { en: 'carry out',         cn: '执行；开展',         type: 'phrase' },
+        { en: 'focus on',          cn: '集中于；关注',       type: 'phrase' },
+        { en: 'regardless of',     cn: '不管；不顾',         type: 'phrase' },
+        { en: 'draw a conclusion', cn: '得出结论',           type: 'phrase' },
+        { en: 'be attributed to',  cn: '归因于',             type: 'phrase' },
+        { en: 'in addition to',    cn: '除…之外',            type: 'phrase' },
+        { en: 'as well as',        cn: '以及；也',           type: 'phrase' }
       ];
       const existing = Store.getErrors();
       BUILTIN.forEach(p => {
         if (!existing.some(w => w.en.toLowerCase() === p.en.toLowerCase())) {
           existing.push({
-            en: p.en, cn: p.cn, type: 'phrase', source: 'builtin',
+            en: p.en, cn: p.cn, type: p.type, source: 'builtin',
             correctCount: 0, wrongCount: 0, mastered: false,
             added: todayKey(), lastSeen: todayKey()
           });
