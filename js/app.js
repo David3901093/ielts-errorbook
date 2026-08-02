@@ -1295,7 +1295,7 @@
       <p class="page-sub">All built-in words, your review words and phrases in one place.</p>
       <div class="row section" style="margin-top:30px;">
         <input id="vSearch" class="input" placeholder="Search English or Chinese..." style="flex:1;" autocomplete="off" />
-        <button class="btn secondary" id="vExport">⬇ Excel</button>
+        <button class="btn secondary" id="vExport">⬇ Export</button>
         <button class="btn ghost" id="vReset" title="Reset all local data">Reset</button>
       </div>
       <div id="vResults" style="margin-top:28px;"></div>
