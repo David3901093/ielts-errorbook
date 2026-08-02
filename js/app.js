@@ -217,11 +217,11 @@
     const lists = [
       { key: 'mix',     label: '🔀 Mixed Review',      count: mixCount,         desc: 'Error words + your phrases, shuffled together' },
       { key: 'errors',  label: '📕 Review List',        count: errors.length,    desc: 'Words you missed in dictation (auto-collected)' },
-      { key: 'ielts',   label: '📘 IELTS 雅思',         count: TS.ielts || 0,    desc: 'IELTS core vocabulary' },
-      { key: 'toefl',   label: '📗 TOEFL 托福',         count: TS.toefl || 0,    desc: 'TOEFL vocabulary' },
-      { key: 'cet4',    label: '📙 CET-4 四级',         count: TS.cet4  || 0,    desc: 'College English Test Band 4' },
-      { key: 'cet6',    label: '📓 CET-6 六级',         count: TS.cet6  || 0,    desc: 'College English Test Band 6' },
-      { key: 'ky',      label: '📔 考研',               count: TS.ky    || 0,    desc: 'Postgraduate entrance exam' }
+      { key: 'ielts',   label: '📘 IELTS',              count: TS.ielts || 0,    desc: 'IELTS core vocabulary' },
+      { key: 'toefl',   label: '📗 TOEFL',              count: TS.toefl || 0,    desc: 'TOEFL vocabulary' },
+      { key: 'cet4',    label: '📙 CET-4',              count: TS.cet4  || 0,    desc: 'College English Test Band 4' },
+      { key: 'cet6',    label: '📓 CET-6',              count: TS.cet6  || 0,    desc: 'College English Test Band 6' },
+      { key: 'ky',      label: '📔 KY',                 count: TS.ky    || 0,    desc: 'Postgraduate entrance exam' }
     ];
     view.innerHTML = `
       <h1 class="page-title">Dictation</h1>
@@ -263,7 +263,7 @@
     } else {
       pool = window.IELTS.BANK.filter(w => (w.tags || '').split(/\s+/).includes(listKey) && w.cn)
         .map(w => ({ en: w.en, cn: w.cn, type: 'word' }));
-      const names = { ielts: 'IELTS', toefl: 'TOEFL', cet4: 'CET-4', cet6: 'CET-6', ky: '考研' };
+      const names = { ielts: 'IELTS', toefl: 'TOEFL', cet4: 'CET-4', cet6: 'CET-6', ky: 'KY' };
       label = names[listKey] || listKey;
     }
     if (!pool.length) {
@@ -427,7 +427,7 @@
         <h3>➕ Add a Word / Phrase</h3>
         <div class="row">
           <input id="bkWord" class="input" placeholder="English word or phrase (e.g. take into account)" autocomplete="off" spellcheck="false" style="flex:2;" />
-          <input id="bkCn" class="input" placeholder="中文意思 / meaning" style="flex:2;" />
+          <input id="bkCn" class="input" placeholder="Chinese meaning" style="flex:2;" />
           <button class="btn" id="bkAdd">Add</button>
         </div>
         <div id="suggestArea" style="margin-top:10px;">${suggestMsg}</div>
@@ -546,7 +546,7 @@
         <h3>➕ Add Word / Phrase</h3>
         <div class="row">
           <input id="phEn" class="input" placeholder="English word or phrase" style="flex:2;" />
-          <input id="phCn" class="input" placeholder="中文意思 Chinese" style="flex:2;" />
+          <input id="phCn" class="input" placeholder="Chinese meaning" style="flex:2;" />
           <button class="btn" id="phAdd">Add</button>
         </div>
       </div>
@@ -559,8 +559,8 @@
               <span class="w">${esc(p.en)}</span>
               <span class="m">${esc(p.cn)}</span>
               ${p.added ? '<span class="tag">custom</span>' : '<span class="badge">built-in</span>'}
-              ${p.added ? `<button class="icon-x" data-delph="${esc(p.en)}" title="删除">✕</button>` : ''}
-            </li>`).join('') || '<li class="muted">空</li>'}
+              ${p.added ? `<button class="icon-x" data-delph="${esc(p.en)}" title="Remove">✕</button>` : ''}
+            </li>`).join('') || '<li class="muted">Empty</li>'}
         </ul>
       </div>
     `;
@@ -571,10 +571,10 @@
     $('#phAdd').addEventListener('click', () => {
       const en = $('#phEn').value.trim();
       const cn = $('#phCn').value.trim();
-      if (!en || !cn) { toast('英文和中文都要填', 'bad'); return; }
+      if (!en || !cn) { toast('Fill in both English and Chinese', 'bad'); return; }
       const ok = window.Store.addPhrase({ en, cn });
-      if (ok) { toast('已添加 ✓', 'ok'); showCnEnPicker(); }
-      else toast('已存在', 'bad');
+      if (ok) { toast('Added ✓', 'ok'); showCnEnPicker(); }
+      else toast('Already exists', 'bad');
     });
     view.querySelectorAll('[data-delph]').forEach(b => b.addEventListener('click', () => {
       window.Store.removePhrase(b.dataset.delph);
@@ -1294,7 +1294,7 @@
       <h1 class="page-title">Vocabulary</h1>
       <p class="page-sub">All built-in words, your review words and phrases in one place.</p>
       <div class="row section" style="margin-top:30px;">
-        <input id="vSearch" class="input" placeholder="Search English or 中文..." style="flex:1;" autocomplete="off" />
+        <input id="vSearch" class="input" placeholder="Search English or Chinese..." style="flex:1;" autocomplete="off" />
         <button class="btn secondary" id="vExport">⬇ Excel</button>
         <button class="btn ghost" id="vReset" title="Reset all local data">Reset</button>
       </div>
