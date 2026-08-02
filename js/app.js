@@ -510,35 +510,44 @@
   }
 
   /* ============================================================
-     CN → EN (phrase dictation — only Chinese module)
+     CN → EN (Chinese-to-English dictation — words + phrases)
      ============================================================ */
   function renderCnEn() {
+    showCnEnPicker();
+  }
+
+  function showCnEnPicker() {
     const phrases = window.Store.getPhrases();
+    const reviewWords = window.Store.getErrors().filter(e => !e.mastered);
+    const mixCount = phrases.length + reviewWords.length;
+    const lists = [
+      { key: 'mix',  label: '🔀 混合默写',  count: mixCount, desc: '词组 + 复习单词混合' },
+      { key: 'phr',  label: '💬 词组默写',  count: phrases.length, desc: '所有自定义词组' },
+      { key: 'rev',  label: '📕 复习单词',  count: reviewWords.length, desc: '复习清单中的单词' }
+    ];
     view.innerHTML = `
       <h1 class="page-title" style="color:var(--text);text-shadow:none;">中译英 · CN → EN</h1>
-      <p class="page-sub" style="color:var(--text-soft);text-shadow:none;">看中文，默写英文词组。做对 +1，做错 −3。</p>
-
-      <div class="card section">
-        <h3>➕ 添加待默写词组</h3>
-        <div class="row">
-          <input id="phEn" class="input" placeholder="英文词组 English phrase" style="flex:2;" />
-          <input id="phCn" class="input" placeholder="中文翻译 Chinese" style="flex:2;" />
-          <button class="btn" id="phAdd">添加</button>
-        </div>
+      <p class="page-sub" style="color:var(--text-soft);text-shadow:none;">看中文，默写英文。做对 +1，做错 −3。</p>
+      <div class="grid grid-2 section">
+        ${lists.map(l => `
+          <div class="card list-pick ${l.count === 0 ? 'disabled' : ''}" data-list="${l.key}">
+            <div class="row" style="justify-content:space-between;align-items:flex-start;">
+              <div>
+                <h3 style="margin:0;">${l.label}</h3>
+                <div class="muted" style="margin-top:4px;">${esc(l.desc)}</div>
+              </div>
+              <span class="badge">${l.count} items</span>
+            </div>
+            <button class="btn small" style="margin-top:14px;" ${l.count === 0 ? 'disabled' : ''}>开始 →</button>
+          </div>`).join('')}
       </div>
 
-      <div class="card section dictate-card" style="max-width:620px;margin-left:auto;margin-right:auto;">
-        <div class="row card-top" style="justify-content:space-between;">
-          <span class="badge" id="phProg">Ready</span>
-          <button class="icon-btn" id="phSay">🔊</button>
-        </div>
-        <h2 class="word-cn" id="phQ">点击下方按钮开始默写</h2>
-        <input id="phInput" class="input dictate-input" placeholder="输入英文词组..." disabled autocomplete="off" spellcheck="false" />
-        <div class="feedback" id="phFb"></div>
-        <div class="row" style="justify-content:center;margin-top:18px;">
-          <button class="btn" id="phStart">开始默写</button>
-          <button class="btn secondary" id="phCheck" disabled>核对</button>
-          <button class="btn ghost" id="phNext" disabled>下一个</button>
+      <div class="card section">
+        <h3>➕ 添加词组/单词</h3>
+        <div class="row">
+          <input id="phEn" class="input" placeholder="英文 English word or phrase" style="flex:2;" />
+          <input id="phCn" class="input" placeholder="中文翻译 Chinese" style="flex:2;" />
+          <button class="btn" id="phAdd">添加</button>
         </div>
       </div>
 
@@ -551,86 +560,126 @@
               <span class="m">${esc(p.cn)}</span>
               ${p.added ? '<span class="tag">custom</span>' : '<span class="badge">built-in</span>'}
               ${p.added ? `<button class="icon-x" data-delph="${esc(p.en)}" title="删除">✕</button>` : ''}
-            </li>`).join('')}
+            </li>`).join('') || '<li class="muted">空</li>'}
         </ul>
       </div>
     `;
-
+    view.querySelectorAll('.list-pick').forEach(card => {
+      if (card.classList.contains('disabled')) return;
+      card.addEventListener('click', () => startCnEn(card.dataset.list));
+    });
     $('#phAdd').addEventListener('click', () => {
       const en = $('#phEn').value.trim();
       const cn = $('#phCn').value.trim();
-      if (!en || !cn) { toast('词组和中文都要填', 'bad'); return; }
+      if (!en || !cn) { toast('英文和中文都要填', 'bad'); return; }
       const ok = window.Store.addPhrase({ en, cn });
-      if (ok) { toast('已添加 ✓', 'ok'); renderCnEn(); }
-      else toast('该词组已存在', 'bad');
+      if (ok) { toast('已添加 ✓', 'ok'); showCnEnPicker(); }
+      else toast('已存在', 'bad');
     });
     view.querySelectorAll('[data-delph]').forEach(b => b.addEventListener('click', () => {
       window.Store.removePhrase(b.dataset.delph);
-      renderCnEn();
+      showCnEnPicker();
     }));
+  }
 
-    // dictation round
-    let round = [];
+  function startCnEn(listKey) {
+    const phrases = window.Store.getPhrases();
+    const reviewWords = window.Store.getErrors().filter(e => !e.mastered);
+    let pool = [];
+    if (listKey === 'phr') {
+      pool = phrases.map(p => ({ en: p.en, cn: p.cn }));
+    } else if (listKey === 'rev') {
+      pool = reviewWords.map(w => ({ en: w.en, cn: w.cn }));
+    } else {
+      pool = [...phrases.map(p => ({ en: p.en, cn: p.cn })),
+              ...reviewWords.map(w => ({ en: w.en, cn: w.cn }))];
+    }
+    if (!pool.length) { toast('No items', 'bad'); showCnEnPicker(); return; }
+    const queue = shuffle(pool).slice(0, Math.min(10, pool.length));
+    runCnEnSession(queue);
+  }
+
+  function runCnEnSession(queue) {
     let i = 0;
-    const start = () => {
-      round = shuffle(phrases).slice(0, Math.min(10, phrases.length));
-      i = 0;
-      $('#phStart').textContent = '重新开始';
-      ask();
-    };
-    const ask = () => {
-      if (i >= round.length) { end(); return; }
-      const p = round[i];
-      $('#phProg').textContent = `${i + 1} / ${round.length}`;
-      $('#phQ').textContent = p.cn;
-      const inp = $('#phInput');
-      inp.value = ''; inp.disabled = false; inp.focus();
-      $('#phFb').textContent = ''; $('#phFb').className = 'feedback';
-      $('#phCheck').disabled = false; $('#phNext').disabled = true;
-      $('#phSay').onclick = () => window.Audio2.speakWord(p.en);
-      // auto-play the phrase pronunciation
+    const draw = () => {
+      const p = queue[i];
+      view.innerHTML = `
+        <h1 class="page-title" style="color:var(--text);text-shadow:none;">中译英 · ${i + 1} / ${queue.length}</h1>
+        <p class="page-sub" style="color:var(--text-soft);text-shadow:none;">看中文，默写英文。做对 +1，做错 −3。</p>
+        <div class="card dictate-box dictate-card slide-in" style="max-width:560px;margin:0 auto;">
+          <div class="row card-top" style="justify-content:space-between;">
+            <span class="badge">${i + 1} / ${queue.length}</span>
+            <button class="icon-btn" id="cnSay" title="Hear pronunciation">🔊</button>
+          </div>
+          <h2 class="word-cn">${esc(p.cn)}</h2>
+          <input id="cnInput" class="input dictate-input" placeholder="输入英文..." autocomplete="off" spellcheck="false" />
+          <div class="feedback" id="cnFb"></div>
+          <div class="row" style="justify-content:center;margin-top:18px;">
+            <button class="btn" id="cnCheck">核对</button>
+            <button class="btn secondary" id="cnSkip">跳过</button>
+            <button class="btn ghost" id="cnBack">◂ 返回</button>
+          </div>
+        </div>
+      `;
+      const input = $('#cnInput');
+      input.focus();
+      $('#cnSay').addEventListener('click', () => window.Audio2.speakWord(p.en));
+      $('#cnBack').addEventListener('click', () => showCnEnPicker());
       autoSay(p.en, 400);
+
+      const check = () => {
+        const ans = input.value.trim();
+        if (!ans) return;
+        const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+        const correct = norm(ans) === norm(p.en);
+        const r = window.Store.recordAnswer(correct);
+        animateScore(r.delta);
+        refreshScore();
+        const fb = $('#cnFb');
+        if (correct) {
+          fb.className = 'feedback ok';
+          fb.innerHTML = `✓ 正确！<b>${esc(p.en)}</b>`;
+          window.Store.bump('cnEnDone');
+          input.disabled = true;
+          setTimeout(() => { i++; if (i >= queue.length) finishCnEn(); else draw(); }, 1200);
+        } else {
+          window.Store.addPhrase({ en: p.en, cn: p.cn });
+          fb.className = 'feedback bad';
+          fb.innerHTML = `✗ 正确答案：<button class="say-inline" data-say="${esc(p.en)}" title="Read aloud">🔊</button><b>${esc(p.en)}</b>`;
+          const sb = fb.querySelector('[data-say]');
+          if (sb) sb.addEventListener('click', () => window.Audio2.speakWord(p.en));
+          input.disabled = true;
+          $('#cnCheck').textContent = i + 1 < queue.length ? '下一个 →' : '完成 ✓';
+          $('#cnCheck').onclick = () => { i++; if (i >= queue.length) finishCnEn(); else draw(); };
+        }
+      };
+      $('#cnCheck').addEventListener('click', check);
+      $('#cnSkip').addEventListener('click', () => { i++; if (i >= queue.length) finishCnEn(); else draw(); });
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { if (input.disabled) { i++; if (i >= queue.length) finishCnEn(); else draw(); } else check(); }
+      });
     };
-    const check = () => {
-      const p = round[i];
-      const ans = $('#phInput').value.trim();
-      if (!ans) return;
-      const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
-      const correct = norm(ans) === norm(p.en);
-      const r = window.Store.recordAnswer(correct);
-      animateScore(r.delta);
-      refreshScore();
-      const fb = $('#phFb');
-      if (correct) {
-        fb.className = 'feedback ok';
-        fb.innerHTML = `✓ 正确！`;
-        window.Store.bump('cnEnDone');
-      } else {
-        // wrong: ensure the phrase is saved to personal phrase bank
-        window.Store.addPhrase({ en: p.en, cn: p.cn });
-        fb.className = 'feedback bad';
-        fb.innerHTML = `✗ 正确答案：<button class="say-inline" data-say="${esc(p.en)}" title="Read aloud">🔊</button><b>${esc(p.en)}</b>`;
-        const sb = fb.querySelector('[data-say]');
-        if (sb) sb.addEventListener('click', () => window.Audio2.speakWord(p.en));
-        $('#phInput').classList.add('shake');
-      }
-      $('#phInput').disabled = true;
-      $('#phCheck').disabled = true;
-      $('#phNext').disabled = false;
-    };
-    const end = () => {
-      const d = window.Store.getDay();
-      $('#phProg').textContent = '完成 ✓';
-      $('#phQ').innerHTML = `本轮完成！今日中译英累计：<b>${d.cnEnDone}</b>，今日得分：<b style="color:${d.score < 0 ? 'var(--fail)' : 'var(--ok)'}">${d.score}</b>`;
-      $('#phInput').value = ''; $('#phInput').disabled = true;
-      $('#phCheck').disabled = true; $('#phNext').disabled = true;
-    };
-    $('#phStart').addEventListener('click', start);
-    $('#phCheck').addEventListener('click', check);
-    $('#phNext').addEventListener('click', () => { i++; ask(); });
-    $('#phInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') { if (!$('#phCheck').disabled) check(); else if (!$('#phNext').disabled) { i++; ask(); } }
-    });
+    draw();
+  }
+
+  function finishCnEn() {
+    const d = window.Store.getDay();
+    view.innerHTML = `
+      <h1 class="page-title" style="color:var(--text);text-shadow:none;">完成 🎉</h1>
+      <div class="card" style="max-width:560px;margin:0 auto;text-align:center;">
+        <div class="grid grid-3">
+          <div class="stat"><div class="num">${d.correct}</div><div class="lbl">CORRECT</div></div>
+          <div class="stat"><div class="num">${d.wrong}</div><div class="lbl">WRONG</div></div>
+          <div class="stat"><div class="num" style="color:${d.score < 0 ? 'var(--fail)' : 'inherit'}">${d.score}</div><div class="lbl">TODAY</div></div>
+        </div>
+        <p class="muted" style="margin-top:14px;">${d.score < 0 ? '⚠️ 今日不合格（积分低于0）' : '做得好！继续保持！'}</p>
+        <div class="row" style="justify-content:center;margin-top:14px;">
+          <button class="btn" id="cnAgain">再来一轮</button>
+          <button class="btn secondary" id="cnLists">◂ 返回列表</button>
+        </div>
+      </div>`;
+    $('#cnAgain').addEventListener('click', () => showCnEnPicker());
+    $('#cnLists').addEventListener('click', () => showCnEnPicker());
   }
 
   /* ============================================================
