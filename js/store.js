@@ -237,52 +237,108 @@ const Store = {
   getSettings() { return read(KEY.settings, { sound: true, seeded: false, autoplay: true }); },
   saveSettings(s) { write(KEY.settings, s); },
 
-  /* ---------- Review list: built-in IELTS phrases + student mistakes ----------
-     Seeds high-frequency IELTS phrases on first run. Student dictation
-     mistakes are added on top. Legacy single-word seeds are cleaned up. */
+  /* ---------- Review list: daily dynamic seeds + student mistakes ----------
+     Each day, randomly picks 10 commonly-misspelled words + 10 IELTS phrases
+     from a larger pool. Student dictation mistakes are preserved on top.
+     Legacy single-word seeds are cleaned up. */
   seedIfFirstRun() {
     // remove legacy seed words (marked seeded:true from old versions)
     const arr = Store.getErrors();
     const cleaned = arr.filter(w => !w.seeded);
     if (cleaned.length !== arr.length) Store.saveErrors(cleaned);
-    // seed 10 high-frequency commonly-misspelled words + 10 IELTS phrases
+
     const s = Store.getSettings();
-    if (!s.phraseSeeded) {
-      const BUILTIN = [
-        // 10 commonly misspelled high-frequency words
-        { en: 'necessary',     cn: '必要的',          type: 'word' },
-        { en: 'accommodate',   cn: '容纳；适应',      type: 'word' },
-        { en: 'definitely',    cn: '明确地',          type: 'word' },
-        { en: 'embarrass',     cn: '使尴尬',          type: 'word' },
-        { en: 'occurrence',    cn: '发生；事件',      type: 'word' },
-        { en: 'privilege',     cn: '特权',            type: 'word' },
-        { en: 'separate',      cn: '分开的',          type: 'word' },
-        { en: 'rhythm',        cn: '节奏',            type: 'word' },
-        { en: 'liaison',       cn: '联络',            type: 'word' },
-        { en: 'conscience',    cn: '良心',            type: 'word' },
-        // 10 high-frequency IELTS phrases
-        { en: 'take into account', cn: '考虑到；把…计算在内', type: 'phrase' },
-        { en: 'in terms of',       cn: '就…而言；在…方面',   type: 'phrase' },
-        { en: 'give rise to',      cn: '引起；导致',         type: 'phrase' },
-        { en: 'carry out',         cn: '执行；开展',         type: 'phrase' },
-        { en: 'focus on',          cn: '集中于；关注',       type: 'phrase' },
-        { en: 'regardless of',     cn: '不管；不顾',         type: 'phrase' },
-        { en: 'draw a conclusion', cn: '得出结论',           type: 'phrase' },
-        { en: 'be attributed to',  cn: '归因于',             type: 'phrase' },
-        { en: 'in addition to',    cn: '除…之外',            type: 'phrase' },
-        { en: 'as well as',        cn: '以及；也',           type: 'phrase' }
-      ];
+    const today = todayKey();
+
+    // full pool of commonly-misspelled words (30)
+    const WORD_POOL = [
+      { en: 'necessary',     cn: '必要的' },
+      { en: 'accommodate',   cn: '容纳；适应' },
+      { en: 'definitely',    cn: '明确地' },
+      { en: 'embarrass',     cn: '使尴尬' },
+      { en: 'occurrence',    cn: '发生；事件' },
+      { en: 'privilege',     cn: '特权' },
+      { en: 'separate',      cn: '分开的' },
+      { en: 'rhythm',        cn: '节奏' },
+      { en: 'liaison',       cn: '联络' },
+      { en: 'conscience',    cn: '良心' },
+      { en: 'maintenance',   cn: '维护；保养' },
+      { en: 'pronunciation', cn: '发音' },
+      { en: 'guarantee',     cn: '保证' },
+      { en: 'exaggerate',    cn: '夸大' },
+      { en: 'mischievous',   cn: '淘气的' },
+      { en: 'questionnaire', cn: '问卷' },
+      { en: 'parallel',      cn: '平行的' },
+      { en: 'calendar',      cn: '日历' },
+      { en: 'grammar',       cn: '语法' },
+      { en: 'tomorrow',      cn: '明天' },
+      { en: 'beautiful',     cn: '美丽的' },
+      { en: 'government',    cn: '政府' },
+      { en: 'environment',   cn: '环境' },
+      { en: 'achievement',   cn: '成就' },
+      { en: 'committee',     cn: '委员会' },
+      { en: 'knowledge',     cn: '知识' },
+      { en: 'restaurant',    cn: '餐厅' },
+      { en: 'temperature',   cn: '温度' },
+      { en: 'successful',    cn: '成功的' },
+      { en: 'truly',         cn: '真正地' }
+    ];
+    // full pool of IELTS phrases (30)
+    const PHRASE_POOL = [
+      { en: 'take into account', cn: '考虑到；把…计算在内' },
+      { en: 'in terms of',       cn: '就…而言；在…方面' },
+      { en: 'give rise to',      cn: '引起；导致' },
+      { en: 'carry out',         cn: '执行；开展' },
+      { en: 'focus on',          cn: '集中于；关注' },
+      { en: 'regardless of',     cn: '不管；不顾' },
+      { en: 'draw a conclusion', cn: '得出结论' },
+      { en: 'be attributed to',  cn: '归因于' },
+      { en: 'in addition to',    cn: '除…之外' },
+      { en: 'as well as',        cn: '以及；也' },
+      { en: 'play a role in',    cn: '在…中起作用' },
+      { en: 'be exposed to',     cn: '暴露于；接触到' },
+      { en: 'be consistent with',cn: '与…一致' },
+      { en: 'put forward',       cn: '提出' },
+      { en: 'be aware of',       cn: '意识到' },
+      { en: 'on the contrary',   cn: '相反' },
+      { en: 'in the long run',   cn: '从长远来看' },
+      { en: 'as a matter of fact',cn: '事实上' },
+      { en: 'to a certain extent',cn: '在某种程度上' },
+      { en: 'keep pace with',    cn: '与…并驾齐驱' },
+      { en: 'contribute to',     cn: '促成；贡献' },
+      { en: 'be subject to',     cn: '受…支配' },
+      { en: 'result in',         cn: '导致' },
+      { en: 'stem from',         cn: '源于' },
+      { en: 'benefit from',      cn: '受益于' },
+      { en: 'be responsible for',cn: '对…负责' },
+      { en: 'cope with',         cn: '应对；处理' },
+      { en: 'be capable of',     cn: '有能力' },
+      { en: 'in favor of',       cn: '支持；赞同' },
+      { en: 'account for',       cn: '解释；占…比例' }
+    ];
+
+    // pick 10 random words + 10 random phrases each day
+    const needReseed = !s.lastSeedDate || s.lastSeedDate !== today;
+    if (needReseed) {
       const existing = Store.getErrors();
-      BUILTIN.forEach(p => {
-        if (!existing.some(w => w.en.toLowerCase() === p.en.toLowerCase())) {
-          existing.push({
-            en: p.en, cn: p.cn, type: p.type, source: 'builtin',
+      // remove yesterday's builtin seeds (keep student-added words)
+      const kept = existing.filter(w => w.source !== 'builtin');
+      // shuffle and pick
+      const pickWords = WORD_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10);
+      const pickPhrases = PHRASE_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 10);
+      [...pickWords.map(w => ({ ...w, type: 'word' })),
+       ...pickPhrases.map(p => ({ ...p, type: 'phrase' }))
+      ].forEach(item => {
+        if (!kept.some(w => w.en.toLowerCase() === item.en.toLowerCase())) {
+          kept.push({
+            en: item.en, cn: item.cn, type: item.type, source: 'builtin',
             correctCount: 0, wrongCount: 0, mastered: false,
-            added: todayKey(), lastSeen: todayKey()
+            added: today, lastSeen: today
           });
         }
       });
-      Store.saveErrors(existing);
+      Store.saveErrors(kept);
+      s.lastSeedDate = today;
       s.phraseSeeded = true;
       Store.saveSettings(s);
     }
