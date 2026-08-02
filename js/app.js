@@ -494,7 +494,16 @@
       });
       return;
     }
-    // no close match → keep as typed
+    // no close match → validate before adding
+    if (!cn) {
+      toast('Please fill in the Chinese meaning, or check your spelling', 'bad');
+      return;
+    }
+    // must look like a real English word/phrase (letters + spaces/hyphens only)
+    if (!/^[a-zA-Z][a-zA-Z'\- ]+$/.test(typed)) {
+      toast('Please enter a valid English word or phrase', 'bad');
+      return;
+    }
     const ok = window.Store.addError({ en: typed, cn: cn });
     finishAdd(ok, wordEl, cnEl);
   }
