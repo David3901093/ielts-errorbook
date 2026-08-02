@@ -421,12 +421,12 @@
 
     view.innerHTML = `
       <h1 class="page-title">Review List</h1>
-      <p class="page-sub">Type a word you got wrong. We'll suggest the correct spelling for you to confirm.</p>
+      <p class="page-sub">Add words or phrases you want to practise. Misspelled words are auto-collected from dictation too.</p>
 
       <div class="card section">
-        <h3>➕ Add a Word</h3>
+        <h3>➕ Add a Word / Phrase</h3>
         <div class="row">
-          <input id="bkWord" class="input" placeholder="English word (misspelled is OK)" autocomplete="off" spellcheck="false" style="flex:2;" />
+          <input id="bkWord" class="input" placeholder="English word or phrase (e.g. take into account)" autocomplete="off" spellcheck="false" style="flex:2;" />
           <input id="bkCn" class="input" placeholder="中文意思 / meaning" style="flex:2;" />
           <button class="btn" id="bkAdd">Add</button>
         </div>
@@ -434,7 +434,7 @@
       </div>
 
       <div class="card section">
-        <h3>📚 My Review Words (${errors.length})</h3>
+        <h3>📚 My Review List (${errors.length})</h3>
         ${list}
       </div>
     `;
