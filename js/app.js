@@ -1234,12 +1234,14 @@
       card.classList.toggle('flipped');
       speakAll();
     });
-    // hover-to-speak: pronounce on mouseenter (desktop)
-    let hoverPlayed = false;
+    // hover-to-speak with debounce: only play if mouse stays >400ms.
+    // Fast swipes across cards are ignored (first card wins).
+    let hoverTimer = null;
     wrap.addEventListener('mouseenter', () => {
-      if (!hoverPlayed) { hoverPlayed = true; speakAll(); }
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => speakAll(), 400);
     });
-    wrap.addEventListener('mouseleave', () => { hoverPlayed = false; });
+    wrap.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); });
     // wire up per-example read-aloud buttons (on the back face)
     wrap.querySelectorAll('[data-say]').forEach(b =>
       b.addEventListener('click', e => {
