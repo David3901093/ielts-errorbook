@@ -1220,10 +1220,13 @@
   }
   function bindFlip(wrap, word, word2) {
     const card = wrap.querySelector('.flip-card');
-    // speak one or two words (for synonym/antonym pairs)
-    const speakAll = () => {
-      window.Audio2.speakWord(word);
-      if (word2) setTimeout(() => window.Audio2.speakWord(word2), 1200);
+    // speak one or two words sequentially (wait for first to finish)
+    const speakAll = async () => {
+      await window.Audio2.speakWord(word);
+      if (word2) {
+        await new Promise(r => setTimeout(r, 500));
+        await window.Audio2.speakWord(word2);
+      }
     };
     card.addEventListener('click', e => {
       // clicking an inline read-aloud button should NOT flip the card
