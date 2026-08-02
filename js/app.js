@@ -745,6 +745,8 @@
       // read-aloud buttons for each example sentence
       view.querySelectorAll('[data-say]').forEach(b =>
         b.addEventListener('click', () => { window.Audio2.speak(b.dataset.say); }));
+      // auto-play the word pronunciation on lookup
+      autoSay(word, 400);
       $('#exAdd').addEventListener('click', () => {
         const v = $('#exInput').value.trim();
         if (!v) return;
@@ -1089,7 +1091,7 @@
             </div>
           </div>
         </div>`);
-      bindFlip(card, p.a);
+      bindFlip(card, p.a, p.b);
       grid.appendChild(card);
     });
   }
@@ -1167,18 +1169,23 @@
     bindFlip(wrap, w.en);
     return wrap;
   }
-  function bindFlip(wrap, word) {
+  function bindFlip(wrap, word, word2) {
     const card = wrap.querySelector('.flip-card');
+    // speak one or two words (for synonym/antonym pairs)
+    const speakAll = () => {
+      window.Audio2.speakWord(word);
+      if (word2) setTimeout(() => window.Audio2.speakWord(word2), 1200);
+    };
     card.addEventListener('click', e => {
       // clicking an inline read-aloud button should NOT flip the card
       if (e.target.closest('.say-inline')) return;
       card.classList.toggle('flipped');
-      window.Audio2.speakWord(word);
+      speakAll();
     });
     // hover-to-speak: pronounce on mouseenter (desktop)
     let hoverPlayed = false;
     wrap.addEventListener('mouseenter', () => {
-      if (!hoverPlayed) { hoverPlayed = true; window.Audio2.speakWord(word); }
+      if (!hoverPlayed) { hoverPlayed = true; speakAll(); }
     });
     wrap.addEventListener('mouseleave', () => { hoverPlayed = false; });
     // wire up per-example read-aloud buttons (on the back face)
