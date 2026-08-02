@@ -1246,7 +1246,7 @@
       <p class="page-sub">All built-in words, your review words and phrases in one place.</p>
       <div class="row section" style="margin-top:30px;">
         <input id="vSearch" class="input" placeholder="Search English or 中文..." style="flex:1;" autocomplete="off" />
-        <button class="btn secondary" id="vExport">⬇ Export</button>
+        <button class="btn secondary" id="vExport">⬇ Excel</button>
         <button class="btn ghost" id="vReset" title="Reset all local data">Reset</button>
       </div>
       <div id="vResults" style="margin-top:28px;"></div>
@@ -1301,13 +1301,22 @@
       vTimer = setTimeout(() => updateResults(e.target.value), 200);
     });
     $('#vExport').addEventListener('click', () => {
-      const data = window.Store.exportAll();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const errs = window.Store.getErrors();
+      const phrs = window.Store.getCustomPhrases();
+      // build CSV (opens in Excel)
+      let csv = '\uFEFFWord/Phrase,Chinese,Type,Correct,Wrong\n';
+      errs.forEach(w => {
+        csv += `"${w.en}","${(w.cn||'').replace(/"/g,'""')}",${w.type === 'phrase' ? 'Phrase' : 'Word'},${w.correctCount||0},${w.wrongCount||0}\n`;
+      });
+      phrs.forEach(p => {
+        csv += `"${p.en}","${(p.cn||'').replace(/"/g,'""')}",Custom Phrase,0,0\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = 'vocab-backup.json'; a.click();
+      a.href = url; a.download = 'vocab-export.csv'; a.click();
       URL.revokeObjectURL(url);
-      toast('Exported backup ✓', 'ok');
+      toast('Exported to CSV (Excel) ✓', 'ok');
     });
     $('#vReset').addEventListener('click', () => {
       if (confirm('Reset ALL local data (review list, phrases, scores)? This cannot be undone.')) {
