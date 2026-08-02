@@ -237,15 +237,53 @@ const Store = {
   getSettings() { return read(KEY.settings, { sound: true, seeded: false, autoplay: true }); },
   saveSettings(s) { write(KEY.settings, s); },
 
-  /* ---------- Review list starts EMPTY (default 0 words) ----------
-     No built-in seeding. Populated purely by dictation mistakes.
-     Also cleans up legacy seed words from older versions. */
+  /* ---------- Review list: built-in IELTS phrases + student mistakes ----------
+     Seeds high-frequency IELTS phrases on first run. Student dictation
+     mistakes are added on top. Legacy single-word seeds are cleaned up. */
   seedIfFirstRun() {
     // remove legacy seed words (marked seeded:true from old versions)
     const arr = Store.getErrors();
     const cleaned = arr.filter(w => !w.seeded);
     if (cleaned.length !== arr.length) Store.saveErrors(cleaned);
+    // seed built-in IELTS phrases (only once, tracked by phraseSeeded flag)
     const s = Store.getSettings();
+    if (!s.phraseSeeded) {
+      const BUILTIN = [
+        { en: 'take into account', cn: '考虑到；把…计算在内' },
+        { en: 'in terms of', cn: '就…而言；在…方面' },
+        { en: 'play a role in', cn: '在…中起作用' },
+        { en: 'give rise to', cn: '引起；导致' },
+        { en: 'be exposed to', cn: '暴露于；接触到' },
+        { en: 'regardless of', cn: '不管；不顾' },
+        { en: 'in addition to', cn: '除…之外' },
+        { en: 'draw a conclusion', cn: '得出结论' },
+        { en: 'be attributed to', cn: '归因于' },
+        { en: 'be consistent with', cn: '与…一致' },
+        { en: 'carry out', cn: '执行；开展' },
+        { en: 'focus on', cn: '集中于；关注' },
+        { en: 'put forward', cn: '提出' },
+        { en: 'be aware of', cn: '意识到' },
+        { en: 'as well as', cn: '以及；也' },
+        { en: 'on the contrary', cn: '相反' },
+        { en: 'in the long run', cn: '从长远来看' },
+        { en: 'as a matter of fact', cn: '事实上' },
+        { en: 'to a certain extent', cn: '在某种程度上' },
+        { en: 'keep pace with', cn: '与…并驾齐驱' }
+      ];
+      const existing = Store.getErrors();
+      BUILTIN.forEach(p => {
+        if (!existing.some(w => w.en.toLowerCase() === p.en.toLowerCase())) {
+          existing.push({
+            en: p.en, cn: p.cn, type: 'phrase', source: 'builtin',
+            correctCount: 0, wrongCount: 0, mastered: false,
+            added: todayKey(), lastSeen: todayKey()
+          });
+        }
+      });
+      Store.saveErrors(existing);
+      s.phraseSeeded = true;
+      Store.saveSettings(s);
+    }
     if (!s.seeded) { s.seeded = true; Store.saveSettings(s); }
   },
 
